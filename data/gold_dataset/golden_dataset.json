@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "question": "¿Qué fármacos se están probando para cáncer de mama?",
+    "expected_answer": "Se están probando fármacos como Fulvestrant, Lapatinib, Abemaciclib, entre otros, en ensayos como NCT02394496 y NCT04565054.",
+    "query_type": "drugs_for_disease"
+  },
+  {
+    "id": 2,
+    "question": "Dame detalles del ensayo NCT02689427",
+    "expected_answer": "El ensayo NCT02689427 estudia Enzalutamide y Paclitaxel para carcinoma de mama triple negativo. Su estado es COMPLETED.",
+    "query_type": "trial_details"
+  },
+  {
+    "id": 3,
+    "question": "¿Qué ensayos clínicos prueban Fulvestrant?",
+    "expected_answer": "Fulvestrant se está probando en los ensayos NCT02394496 y NCT06954961.",
+    "query_type": "trials_for_drug"
+  },
+  {
+    "id": 4,
+    "question": "¿Qué fármacos se prueban en el ensayo NCT04565054?",
+    "expected_answer": "En el ensayo NCT04565054 se prueba Abemaciclib.",
+    "query_type": "drugs_for_trial" 
+  }
+]

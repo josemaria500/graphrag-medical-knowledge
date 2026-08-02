@@ -1,0 +1,54 @@
+{
+  "results": [
+    {
+      "question": "¿Qué fármacos se están probando para cáncer de mama?",
+      "expected": "Se están probando fármacos como Fulvestrant, Lapatinib, Abemaciclib, entre otros, en ensayos como NCT02394496 y NCT04565054.",
+      "generated": "Se están probando los siguientes fármacos para el cáncer de mama en diversos ensayos clínicos:\n\n1. **KS24.22 cells** - Ensayo NCT01127074.\n2. **Fulvestrant** - Ensayos NCT02394496 y NCT06954961.\n3. **Lapatinib** - Ensayo NCT02394496.\n4. **Aromatase Inhibitors** - Ensayo NCT02394496.\n5. **Placebo Lapatinib** - Ensayo NCT02394496.\n6. **Abemaciclib** - Ensayo NCT04565054.\n7. **D-0502** - Ensayo NCT06954961.\n8. **Telapristone acetate** - Ensayo NCT01800422.\n9. **Placebo** - Ensayo NCT01800422.\n\nEstos fármacos están siendo evaluados en diferentes ensayos clínicos para determinar su eficacia y seguridad en el tratamiento del cáncer de mama.",
+      "scores": {
+        "relevancia": 5,
+        "completitud": 5,
+        "fidelidad": 5,
+        "justificacion": "La respuesta aborda directamente la pregunta sobre los fármacos en prueba para el cáncer de mama, proporcionando una lista detallada de fármacos y sus respectivos ensayos clínicos. No hay información innecesaria y todos los datos parecen ser correctos y relevantes."
+      }
+    },
+    {
+      "question": "Dame detalles del ensayo NCT02689427",
+      "expected": "El ensayo NCT02689427 estudia Enzalutamide y Paclitaxel para carcinoma de mama triple negativo. Su estado es COMPLETED.",
+      "generated": "El ensayo clínico NCT02689427 se titula \"Enzalutamide and Paclitaxel Before Surgery in Treating Patients With Stage I-III Androgen Receptor-Positive Triple-Negative Breast Cancer\". Este ensayo ha sido completado y se centra en el tratamiento de pacientes con carcinoma de mama invasivo, específicamente aquellos con carcinoma de mama triple negativo y positivo para el receptor de andrógenos. \n\nLos tratamientos involucrados en este ensayo incluyen Enzalutamide y Paclitaxel, así como procedimientos quirúrgicos como la disección de ganglios linfáticos axilares, biopsia de ganglios linfáticos y cirugía convencional terapéutica. \n\nSi necesitas más información sobre este ensayo o detalles específicos, házmelo saber.",
+      "scores": {
+        "relevancia": 5,
+        "completitud": 5,
+        "fidelidad": 5,
+        "justificacion": "La respuesta aborda directamente la pregunta proporcionando el título del ensayo, su estado y detalles sobre los tratamientos involucrados, lo que la hace altamente relevante, completa y fiel a los datos del ensayo clínico."
+      }
+    },
+    {
+      "question": "¿Qué ensayos clínicos prueban Fulvestrant?",
+      "expected": "Fulvestrant se está probando en los ensayos NCT02394496 y NCT06954961.",
+      "generated": "Los ensayos clínicos que prueban Fulvestrant son:\n\n1. **NCT02394496**: Overcoming Endocrine Resistance in Metastatic Breast Cancer (Estado: UNKNOWN)\n2. **NCT06954961**: A Study to Evaluate D-0502 in Subjects With ER+ Her2- Locally Advanced or Metastatic Breast Cancer (Estado: RECRUITING) \n\nSi necesitas más información sobre alguno de estos ensayos, házmelo saber.",
+      "scores": {
+        "relevancia": 5,
+        "completitud": 5,
+        "fidelidad": 5,
+        "justificacion": "La respuesta aborda directamente la pregunta proporcionando los ensayos clínicos específicos que prueban Fulvestrant, incluyendo sus identificadores y estados actuales, lo que la hace altamente relevante, completa y fiel a los datos."
+      }
+    },
+    {
+      "question": "¿Qué fármacos se prueban en el ensayo NCT04565054?",
+      "expected": "En el ensayo NCT04565054 se prueba Abemaciclib.",
+      "generated": "En el ensayo NCT04565054 se prueba el fármaco Abemaciclib.",
+      "scores": {
+        "relevancia": 5,
+        "completitud": 5,
+        "fidelidad": 5,
+        "justificacion": "La respuesta generada aborda directamente la pregunta, contiene toda la información relevante y es completamente fiel a los datos del ensayo, mencionando correctamente el fármaco Abemaciclib."
+      }
+    }
+  ],
+  "average_scores": {
+    "relevancia": 5.0,
+    "completitud": 5.0,
+    "fidelidad": 5.0
+  },
+  "total_questions": 4
+}

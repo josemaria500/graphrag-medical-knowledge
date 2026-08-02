@@ -1,0 +1,524 @@
+{
+  "nodes": [
+    {
+      "id": "NCT03543397",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "MRI in Ductal Carcinoma in Situ (DCIS)",
+        "status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "Ductal Carcinomas",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "NCT01127074",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "Vaccination of Metastatic Breast Cancer Patients With a CD80-modified Allogeneic Cancer Cell Line (KS2422)",
+        "status": "COMPLETED"
+      }
+    },
+    {
+      "id": "KS24.22 cells",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Metastatic Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "NCT04861220",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "Surgical Pre-habilitation in Breast Cancer",
+        "status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "Breast Neoplasm",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "Physical exercise",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "NCT05484180",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "The Effect of Guided Imagery Based on the Health Promotion Model on the Quality of Life in Breast Cancer Patients",
+        "status": "COMPLETED"
+      }
+    },
+    {
+      "id": "Guided Imagery",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "NCT02689427",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "Enzalutamide and Paclitaxel Before Surgery in Treating Patients With Stage I-III Androgen Receptor-Positive Triple-Negative Breast Cancer",
+        "status": "COMPLETED"
+      }
+    },
+    {
+      "id": "Enzalutamide",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Paclitaxel",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Axillary Lymph Node Dissection",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "Lymph Node Biopsy",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "Therapeutic Conventional Surgery",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "Invasive Breast Carcinoma",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "Triple-Negative Breast Carcinoma",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "Androgen Receptor",
+      "label": "Biomarker",
+      "properties": {}
+    },
+    {
+      "id": "NCT04565054",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "Adjuvant Therapy With Abemaciclib + SOC ET vs. SOC ET in Clinical or Genomic High Risk, HR+/HER2- EBC",
+        "status": "ACTIVE_NOT_RECRUITING"
+      }
+    },
+    {
+      "id": "Abemaciclib",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "NCT01800422",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "Oral CDB-4124 vs. Placebo in Stage I-II Primary Breast Cancer",
+        "status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "telapristone acetate",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "placebo",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "therapeutic conventional surgery",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "laboratory biomarker analysis",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "questionnaire administration",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "Stage IA Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "Stage IB Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "Stage II Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "NCT02394496",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "Overcoming Endocrine Resistance in Metastatic Breast Cancer",
+        "status": "UNKNOWN"
+      }
+    },
+    {
+      "id": "Fulvestrant",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Lapatinib",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Aromatase Inhibitors",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Placebo Lapatinib",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Metastatic Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "NCT01431196",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "Trial With Autologous Dendritic Cell Vaccination in Patients With Stage II-III HER2 Negative Breast Cancer",
+        "status": "COMPLETED"
+      }
+    },
+    {
+      "id": "Autologous dendritic cell vaccination",
+      "label": "Intervention",
+      "properties": {}
+    },
+    {
+      "id": "Stage II Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "Stage III Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    },
+    {
+      "id": "NCT06954961",
+      "label": "ClinicalTrial",
+      "properties": {
+        "title": "A Study to Evaluate D-0502 in Subjects With ER+ Her2- Locally Advanced or Metastatic Breast Cancer",
+        "status": "RECRUITING"
+      }
+    },
+    {
+      "id": "D-0502",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Fulvestrant",
+      "label": "Drug",
+      "properties": {}
+    },
+    {
+      "id": "Breast Cancer",
+      "label": "Disease",
+      "properties": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "NCT03543397",
+      "target": "Ductal Carcinomas",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT01127074",
+      "target": "KS24.22 cells",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT01127074",
+      "target": "Metastatic Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT04861220",
+      "target": "Physical exercise",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT04861220",
+      "target": "Breast Neoplasm",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT05484180",
+      "target": "Guided Imagery",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT05484180",
+      "target": "Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT02689427",
+      "target": "Enzalutamide",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02689427",
+      "target": "Paclitaxel",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02689427",
+      "target": "Axillary Lymph Node Dissection",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02689427",
+      "target": "Lymph Node Biopsy",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02689427",
+      "target": "Therapeutic Conventional Surgery",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02689427",
+      "target": "Invasive Breast Carcinoma",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT02689427",
+      "target": "Triple-Negative Breast Carcinoma",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "Enzalutamide",
+      "target": "Androgen Receptor",
+      "type": "TARGETS",
+      "properties": {}
+    },
+    {
+      "source": "NCT04565054",
+      "target": "Abemaciclib",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT04565054",
+      "target": "Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT01800422",
+      "target": "telapristone acetate",
+      "type": "TESTS",
+      "properties": {
+        "phase": "UNKNOWN"
+      }
+    },
+    {
+      "source": "NCT01800422",
+      "target": "placebo",
+      "type": "TESTS",
+      "properties": {
+        "phase": "UNKNOWN"
+      }
+    },
+    {
+      "source": "NCT01800422",
+      "target": "therapeutic conventional surgery",
+      "type": "TESTS",
+      "properties": {
+        "phase": "UNKNOWN"
+      }
+    },
+    {
+      "source": "NCT01800422",
+      "target": "laboratory biomarker analysis",
+      "type": "TESTS",
+      "properties": {
+        "phase": "UNKNOWN"
+      }
+    },
+    {
+      "source": "NCT01800422",
+      "target": "questionnaire administration",
+      "type": "TESTS",
+      "properties": {
+        "phase": "UNKNOWN"
+      }
+    },
+    {
+      "source": "NCT01800422",
+      "target": "Stage IA Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT01800422",
+      "target": "Stage IB Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT01800422",
+      "target": "Stage II Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT02394496",
+      "target": "Fulvestrant",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02394496",
+      "target": "Lapatinib",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02394496",
+      "target": "Aromatase Inhibitors",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02394496",
+      "target": "Placebo Lapatinib",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT02394496",
+      "target": "Metastatic Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT01431196",
+      "target": "Autologous dendritic cell vaccination",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT01431196",
+      "target": "Stage II Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT01431196",
+      "target": "Stage III Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    },
+    {
+      "source": "NCT06954961",
+      "target": "D-0502",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT06954961",
+      "target": "Fulvestrant",
+      "type": "TESTS",
+      "properties": {
+        "phase": "N/A"
+      }
+    },
+    {
+      "source": "NCT06954961",
+      "target": "Breast Cancer",
+      "type": "STUDIES",
+      "properties": {}
+    }
+  ]
+}
