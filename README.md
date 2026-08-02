@@ -67,8 +67,8 @@ GraphVector/
 
 ### 1. Instalación
 ```bash
-git clone https://github.com/tu-usuario/GraphVector.git
-cd GraphVector
+git clone https://github.com/josemaria500/graphrag-medical-knowledge.git
+cd graphrag-medical-knowledge
 
 python -m venv .venv
 source .venv/bin/activate  # En Windows: .venv\Scripts\activate
