@@ -1,0 +1,26 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Variables de entorno / secretos
+.env
+
+# Datos locales
+data/
+
+# Git
+.git/
+.gitignore
+
+# Documentación
+README.md
+
+# Qwen / archivos temporales
+qwen_files.txt

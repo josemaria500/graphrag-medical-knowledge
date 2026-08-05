@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>José María Gálvez | Data & AI Engineer</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --accent: #38bdf8;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header { padding: 4rem 2rem 2rem; text-align: center; }
+  header h1 { font-size: 2.5rem; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); margin-top: .5rem; font-size: 1.1rem; }
+  main { flex: 1; max-width: 900px; margin: 0 auto; padding: 2rem; width: 100%; }
+  h2.section {
+    margin: 2rem 0 1.2rem;
+    font-size: 1.1rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 2px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: transform .2s, border-color .2s;
+    display: flex; flex-direction: column;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--accent); }
+  .card h3 { margin-bottom: .6rem; }
+  .card p { color: var(--muted); font-size: .95rem; flex: 1; }
+  .tags { margin: 1rem 0; display: flex; flex-wrap: wrap; gap: .4rem; }
+  .tag {
+    background: #0ea5e922; color: var(--accent);
+    padding: .2rem .6rem; border-radius: 999px; font-size: .75rem;
+  }
+  .links { display: flex; gap: .6rem; flex-wrap: wrap; }
+  .btn {
+    text-decoration: none; color: var(--bg); background: var(--accent);
+    padding: .5rem 1rem; border-radius: 8px; font-weight: 600; font-size: .9rem;
+    border: none; cursor: pointer; font-family: inherit;
+  }
+  .btn.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+
+  /* Formulario de contacto */
+  .contact-form {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+  }
+  .contact-form p.intro {
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+  .form-group { margin-bottom: 1.2rem; }
+  .form-group label {
+    display: block;
+    font-size: .9rem;
+    margin-bottom: .4rem;
+    color: var(--muted);
+  }
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: .7rem .9rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: .95rem;
+    transition: border-color .2s;
+  }
+  .form-group input:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .form-group textarea {
+    min-height: 120px;
+    resize: vertical;
+  }
+  .form-group input[type="text"].hidden {
+    position: absolute;
+    left: -9999px;
+    opacity: 0;
+  }
+
+  footer { padding: 2rem; text-align: center; border-top: 1px solid var(--border); }
+  footer a { color: var(--muted); text-decoration: none; margin: 0 .8rem; }
+  footer a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>José María Gálvez <span>| Data & AI Engineer</span></h1>
+  <p>Construyo sistemas de datos e IA de principio a fin: del pipeline al agente.</p>
+</header>
+
+<main>
+  <h2 class="section">Proyectos</h2>
+  <div class="grid">
+
+    <!-- Proyecto: GraphRAG -->
+    <div class="card">
+      <h3>🩺 GraphRAG Medical Knowledge</h3>
+      <p>
+        Sistema Retrieval Augmented Generation sobre un grafo de conocimiento de
+        ensayos clínicos de cáncer de mama (ClinicalTrials.gov + Neo4j + GPT-4o-mini).
+        Pregunta en lenguaje natural y explora el grafo en vivo.
+      </p>
+      <div class="tags">
+        <span class="tag">Python</span><span class="tag">FastAPI</span>
+        <span class="tag">Streamlit</span><span class="tag">Neo4j</span>
+        <span class="tag">OpenAI</span><span class="tag">Docker</span>
+        <span class="tag">Nginx</span>
+      </div>
+      <div class="links">
+        <a class="btn" href="/graphrag/">Ver aplicación</a>
+        <a class="btn secondary" href="/api/docs">API Docs</a>
+      </div>
+    </div>
+    <!-- Próximo proyecto: duplica el bloque .card anterior -->
+
+  </div>
+
+  <!-- Sección de contacto -->
+  <h2 class="section">Contacto</h2>
+  <div class="contact-form">
+    <p class="intro">
+      ¿Quieres hablar sobre oportunidades, colaboraciones o simplemente comentar algún proyecto?
+      Escríbeme usando este formulario.
+    </p>
+
+    <!--
+      FormSubmit.co reenvía el mensaje a tu email.
+      La primera vez recibirás un email de confirmación; tras confirmarlo, todos los mensajes llegan directo.
+      El atributo _subject personaliza el asunto del email que recibes.
+      El campo _next es la URL a la que redirige tras enviar (puedes dejarla así).
+    -->
+    <form action="https://formsubmit.co/jmgm.bq@gmail.com" method="POST">
+      <!-- Configuración FormSubmit -->
+      <input type="hidden" name="_subject" value="Nuevo mensaje desde tu portfolio">
+      <input type="hidden" name="_captcha" value="true">
+      <input type="hidden" name="_template" value="table">
+      <input type="hidden" name="_next" value="/">
+
+      <!-- Honeypot anti-spam (invisible) -->
+      <input type="text" name="_honey" class="hidden" style="display:none">
+
+      <div class="form-group">
+        <label for="name">Nombre</label>
+        <input type="text" id="name" name="name" required>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Tu email</label>
+        <input type="email" id="email" name="email" required>
+      </div>
+
+      <div class="form-group">
+        <label for="message">Mensaje</label>
+        <textarea id="message" name="message" required placeholder="Cuéntame en qué puedo ayudarte..."></textarea>
+      </div>
+
+      <button type="submit" class="btn">Enviar mensaje</button>
+    </form>
+  </div>
+</main>
+
+<footer>
+  <a href="https://github.com/josemaria500" target="_blank">GitHub</a>
+  <a href="https://www.linkedin.com/in/josemariagalvez/" target="_blank">LinkedIn</a>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,44 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: graphrag_api
+    env_file:
+      - .env
+    networks:
+      - graphrag_net
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: graphrag_web
+    environment:
+      - API_URL=http://api:8000/query
+      - STREAMLIT_SERVER_BASE_URL_PATH=graphrag
+    depends_on:
+      - api
+    networks:
+      - graphrag_net
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: graphrag_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/home:/usr/share/nginx/html:ro   # ← Home del portfolio
+    depends_on:
+      - api
+      - web
+    networks:
+      - graphrag_net
+    restart: unless-stopped
+
+networks:
+  graphrag_net:
+    driver: bridge

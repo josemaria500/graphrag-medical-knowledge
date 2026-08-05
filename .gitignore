@@ -1,1 +1,31 @@
+# Secretos (CRÍTICO)
 .env
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Datos pesados (opcional, pero recomendado para no saturar GitHub)
+# data/raw/
+# data/processed/
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Docker (opcional, si no quieres subir volúmenes)
+# data/
