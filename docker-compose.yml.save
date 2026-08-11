@@ -12,6 +12,16 @@ services:
       - 8.8.4.4
     networks:
       - graphrag_net
+    restart: unless-stoppedservices:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: graphrag_api
+    env_file:
+      - .env
+    networks:
+      - graphrag_net
     restart: unless-stopped
 
   web:

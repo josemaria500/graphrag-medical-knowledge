@@ -1,0 +1,9 @@
+# Producción: HTTPS con Let's Encrypt.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  nginx:
+    command: ["nginx", "-c", "/etc/nginx/nginx.ssl.conf", "-g", "daemon off;"]
+    ports:
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
