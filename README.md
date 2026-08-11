@@ -1,144 +1,171 @@
-#  GraphRAG: Ensayos Clínicos de Cáncer de Mama
+# 🩺 GraphRAG Medical Knowledge
 
-Sistema de **Retrieval Augmented Generation (GraphRAG)** diseñado para responder preguntas complejas y de múltiples saltos (multi-hop) sobre ensayos clínicos de cáncer de mama. Combina la búsqueda estructurada de un Grafo de Conocimiento (Neo4j) con la síntesis de lenguaje natural de LLMs, superando las limitaciones del RAG vectorial tradicional en dominios médicos.
+**Sistema GraphRAG sobre un grafo de conocimiento de ensayos clínicos de cáncer de mama: pregunta en lenguaje natural y explora el grafo en vivo.**
 
----
-
-## ✨ Características Clave
-
-- **Ontología Médica Unificada:** Modelo de grafo diseñado para conectar Fármacos, Ensayos Clínicos, Enfermedades y Biomarcadores, permitiendo razonamiento multi-salto.
-- **Patrón Repositorio:** Capa de abstracción de la base de datos que permite migrar de Neo4j AuraDB (Cloud) a Neo4j Community (Self-hosted) sin modificar la lógica de negocio.
-- **Query Understanding con LLM:** Módulo que traduce preguntas en lenguaje natural a entidades estructuradas, manejando sinónimos y múltiples idiomas.
-- **Evaluación Automatizada (LLM-as-a-Judge):** Pipeline de evaluación continua usando un Golden Dataset y un LLM juez para medir Relevancia, Completitud y Fidelidad (anti-alucinación).
+🔗 **Demo en producción:** [https://josemariagalvez.es](https://josemariagalvez.es)
+- Portfolio → `/`
+- Aplicación (Streamlit + grafo interactivo) → `/graphrag/`
+- API (FastAPI + Swagger) → `/api/docs`
 
 ---
+
+## 📌 ¿Qué es este proyecto?
+
+Pipeline **GraphRAG completo** sobre datos reales de ensayos clínicos (ClinicalTrials.gov), desplegado de punta a punta:
+
+1. **Ingesta** – Parseo de ensayos y extracción de entidades (fármacos, enfermedades, biomarcadores) con LLM.
+2. **Grafo de conocimiento** – Almacenamiento en **Neo4j** con esquema tipado.
+3. **Retrieval** – Traducción de preguntas en lenguaje natural a consultas **Cypher** (query understanding con LLM).
+4. **Generación** – Respuestas fundamentadas con **GPT-4o-mini** (RAG sobre el contexto del grafo).
+5. **Visualización** – Grafo interactivo que reacciona a cada consulta (pyvis).
+6. **Serving** – API FastAPI + frontend Streamlit + home estática de portfolio, todo tras **Nginx** con **HTTPS** (Let's Encrypt) en un VPS, 100 % **Dockerizado**.
 
 ## 🏗️ Arquitectura
 
-El sistema sigue una arquitectura modular y extensible, separando claramente las responsabilidades de ingesta, almacenamiento, retrieval y generación.
-
 ```text
-[ ClinicalTrials.gov API ] 
-         ↓ (JSON)
-[ Ingestion Pipeline (Pydantic + LLM Extraction) ]
-         ↓ (Nodes & Edges)
-[ Graph Repository Pattern (Neo4j AuraDB) ]
-         ↓ (Cypher Queries)
-[ GraphRAG Orchestrator (Query Understanding + Context Formatting) ]
-         ↓ (Prompt)
-[ LLM Generator (GPT-4o-mini) ] → Respuesta Natural
+                     Internet (443/80)
+                            │
+                 ┌──────────▼──────────┐
+                 │  Nginx (reverse     │
+                 │  proxy + home)      │
+                 └──┬────────┬────────┬┘
+                    │        │        │
+              /     │   /graphrag/    │   /api/
+        (home estática)      │        │
+                    │ ┌──────▼──────┐ │ ┌─────────────┐
+                    │ │  Streamlit  │─┼▶│   FastAPI   │
+                    │ │  (frontend) │   │  (backend)  │
+                    │ └─────────────┘   └──┬───────┬──┘
+                    │                      │       │
+                    │              ┌───────▼──┐ ──▼───────────┐
+                    │              │ Neo4j    │ │ OpenAI       │
+                    │              │ AuraDB   │ │ GPT-4o-mini  │
+                    │              └──────────┘ └──────────────┘
+                    └─ Todo orquestado con Docker Compose
 ```
 
----
+## 🧬 Esquema del grafo
 
-## 🛠️ Tech Stack
-
-- **Lenguaje:** Python 3.12+
-- **LLM & Embeddings:** OpenAI API (GPT-4o-mini)
-- **Base de Datos de Grafos:** Neo4j AuraDB (con driver oficial `neo4j`)
-- **Validación de Datos:** Pydantic
-- **Gestión de Entorno:** `python-dotenv`, `venv`
-
----
-
-## 📂 Estructura del Proyecto
-
-```text
-GraphVector/
-├── config/
-│   └── settings.py          # Configuración centralizada
-├── data/
-│   ├── raw/                 # Datos crudos de la API
-│   ├── processed/           # Entidades y relaciones extraídas
-│   └── gold_dataset/        # Dataset de evaluación y reportes
-├── src/
-│   ├── ingestion/           # Parsers, modelos Pydantic y extracción LLM
-│   ├── graph/               # Patrón Repositorio e implementación Neo4j
-│   ├── retrieval/           # Graph Retriever, Query Understanding y Generator
-│   └── evaluation/          # Evaluator (LLM-as-a-Judge)
-├── main.py                  # Script de entrada principal
-├── requirements.txt         # Dependencias
-└── README.md
+```cypher
+(:ClinicalTrial)-[:TESTS]->(:Drug | :Intervention)
+(:ClinicalTrial)-[:STUDIES]->(:Disease)
+(:Drug)-[:TARGETS]->(:Biomarker)
 ```
 
----
+## ❓ Consultas soportadas
 
-## 🚀 Cómo ejecutar
+| Tipo | Ejemplo |
+|---|---|
+| Fármacos por enfermedad | *¿Qué fármacos se están probando para cáncer de mama?* |
+| Ensayos por fármaco | *¿Qué ensayos clínicos prueban Abemaciclib?* |
+| Detalles de un ensayo | *Dame detalles del ensayo NCT02689427* |
+| Fármacos de un ensayo | *¿Qué fármacos se prueban en NCT02689427?* |
+| Biomarcadores por fármaco | *¿Qué biomarcadores targetea Olaparib?* |
 
-### 1. Instalación
+## 🔌 API
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/api/health` | GET | Estado del servicio |
+| `/api/graph?limit=200` | GET | Muestra del grafo completo (nodos + enlaces) |
+| `/api/query` | POST | `{question}` → `{answer, graph, query_type}` |
+
 ```bash
-git clone https://github.com/josemaria500/graphrag-medical-knowledge.git
-cd graphrag-medical-knowledge
-
-python -m venv .venv
-source .venv/bin/activate  # En Windows: .venv\Scripts\activate
-
-pip install -r requirements.txt
+curl -X POST https://josemariagalvez.es/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "¿Qué ensayos clínicos prueban Abemaciclib?"}'
 ```
 
-### 2. Configuración
-Crea un archivo `.env` en la raíz del proyecto con tus credenciales:
-```env
-OPENAI_API_KEY=tu_api_key_de_openai
-NEO4J_URI=neo4j+s://tu_instancia.databases.neo4j.io
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=tu_password_de_neo4j
-```
+## 📊 Evaluación
 
-### 3. Ejecución
-**Ejecutar el pipeline completo (Ingesta + Pruebas de Retrieval):**
-```bash
-python main.py
-```
+El sistema incluye un **golden dataset** con preguntas de referencia y respuestas esperadas, y un **evaluador LLM-as-judge** que puntúa cada respuesta generada en tres dimensiones (escala 1–5):
 
-**Ejecutar la Evaluación Automatizada (LLM-as-a-Judge):**
+- **Relevancia** – ¿responde directamente a lo preguntado, sin ruido?
+- **Completitud** – ¿incluye toda la información requerida?
+- **Fidelidad** – ¿es fiel a los datos del grafo, sin inventar nada?
+
+### Resultados
+
+| Métrica | Puntuación media |
+|---|---|
+| 🎯 Relevancia | **5.0 / 5** |
+| 📋 Completitud | **5.0 / 5** |
+| 🔒 Fidelidad | **5.0 / 5** |
+
+> Evaluado sobre **4 preguntas** del golden dataset. Todas las respuestas obtuvieron **5/5** en las tres dimensiones.
+
+### Detalle por pregunta
+
+| Pregunta | Relevancia | Completitud | Fidelidad |
+|---|:---:|:---:|:---:|
+| ¿Qué fármacos se están probando para cáncer de mama? | 5 | 5 | 5 |
+| Dame detalles del ensayo NCT02689427 | 5 | 5 | 5 |
+| ¿Qué ensayos clínicos prueban Fulvestrant? | 5 | 5 | 5 |
+| ¿Qué fármacos se prueban en el ensayo NCT04565054? | 5 | 5 | 5 |
+
+Reproducir la evaluación:
+
 ```bash
 python main.py --evaluate
 ```
 
----
+## 🚀 Ejecutar en local
 
-## 📊 Evaluación del Sistema
+```bash
+git clone https://github.com/josemaria500/graphrag-medical-knowledge.git
+cd graphrag-medical-knowledge
 
-A diferencia de los proyectos tradicionales, este sistema incluye un pipeline de evaluación automatizada para medir la calidad y evitar alucinaciones. Utilizamos un **Golden Dataset** de 4 preguntas críticas y un LLM juez para calificar las respuestas.
+cat > .env <<EOF
+NEO4J_URI=neo4j+s://TU_INSTANCIA.databases.neo4j.io:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=TU_PASSWORD
+OPENAI_API_KEY=TU_KEY
+EOF
 
-### Resultados Finales
+python -m venv .venv && source .venv/bin/activate
+pip install -r backend/requirements.txt
+python main.py
 
-| Métrica | Puntuación (1-5) |
-|---------|------------------|
-| **Relevancia** | 5.00 / 5 |
-| **Completitud** | 5.00 / 5 |
-| **Fidelidad (Anti-alucinación)** | 5.00 / 5 |
-| **Score Global** | **5.00 / 5** |
+docker compose up --build -d
+```
 
-*Nota: El sistema partió de un score inicial de 2.92/5. Tras analizar los fallos del LLM-as-a-Judge, se iteró sobre el formateo del contexto y el prompt del generador, alcanzando la puntuación perfecta.*
+## 🐳 Producción
 
----
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
 
-## 🤔 Trade-offs y Decisiones de Diseño
+- **Nginx** sirve la home estática, enruta `/graphrag/` (Streamlit, con WebSockets) y `/api/` (FastAPI).
+- **HTTPS** con Let's Encrypt (Certbot + webroot) y renovación automática.
 
-Como Ingeniero de IA, cada decisión técnica se tomó evaluando los pros y los contras:
+## 🗂️ Estructura del proyecto
 
-1. **¿Por qué GraphRAG y no RAG Vectorial?**
-   El RAG vectorial falla en preguntas multi-salto (ej. *"¿Qué fármacos prueban ensayos que estudian la enfermedad X?"*). El grafo resuelve esto traversando relaciones explícitas (`Trial`-[:STUDIES]->`Disease`), garantizando precisión estructural.
+```text
+├── backend/            # API FastAPI (Dockerfile, api.py)
+├── frontend/           # Streamlit + visualización pyvis
+├── nginx/              # Reverse proxy + home del portfolio
+│   └── home/index.html
+├── config/settings.py  # Carga de configuración (.env)
+├── src/
+│   ├── ingestion/      # Parseo ClinicalTrials.gov + extracción LLM
+│   ├── graph/          # Repositorio Neo4j
+│   ├── retrieval/      # GraphRAG: retriever Cypher, generator, query understanding
+│   └── evaluation/     # Evaluador con golden dataset
+├── data/
+│   ├── raw/            # Muestra de ensayos clínicos
+│   └── gold_dataset/   # Dataset de evaluación
+├── docker-compose.yml       # Entorno base (HTTP)
+├── docker-compose.prod.yml  # Override producción (HTTPS)
+└── main.py                  # Pipeline de ingesta + pruebas + evaluación
+```
 
-2. **¿Por qué LLM API en lugar de Local?**
-   Para la extracción de entidades médicas, la precisión de GPT-4o-mini justifica su coste (~$0.02 por 10 ensayos) frente al tiempo de ingeniería y la alta tasa de alucinación de modelos locales de 8B sin fine-tuning específico.
+## 🛠️ Stack
 
-3. **¿Por qué el Patrón Repositorio?**
-   Permite desacoplar la lógica de negocio de la base de datos. Si mañana el cliente exige que los datos sensibles no salgan de su VPC, podemos cambiar de AuraDB a Neo4j Community en Docker cambiando solo las variables de entorno.
+`Python` · `FastAPI` · `Streamlit` · `Neo4j (Cypher)` · `OpenAI GPT-4o-mini` · `pyvis` · `Docker` · `Nginx` · `Let's Encrypt` · `Git`
 
----
+## 📬 Contacto
 
-## 🔮 Mejoras Futuras (Roadmap)
-
-- **Ingesta Multi-fuente:** Extender el pipeline modular para ingerir Guías Clínicas (NCCN/SEOM) y Literatura Biomédica (PubMed).
-- **API REST:** Exponer el sistema mediante FastAPI para su integración en aplicaciones clínicas.
-- **Frontend Interactivo:** Interfaz web con Streamlit para visualización en tiempo real del grafo y las respuestas.
-- **Text-to-Cypher Avanzado:** Implementar un agente que genere queries Cypher dinámicas en lugar de usar handlers predefinidos.
-
----
-
-## 📄 Licencia
-
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
+**José María Gálvez** — Data & AI Engineer
+- 🌐 [josemariagalvez.es](https://josemariagalvez.es)
+- 💼 [LinkedIn](https://www.linkedin.com/in/josemariagalvez/)
+- 🐙 [GitHub](https://github.com/josemaria500)
