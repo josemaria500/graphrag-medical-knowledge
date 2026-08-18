@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 from .models import ClinicalTrial, Intervention
+from datetime import datetime
+
 
 def parse_clinical_trials(json_path: str) -> list[ClinicalTrial]:
     """
@@ -59,7 +61,9 @@ def parse_clinical_trials(json_path: str) -> list[ClinicalTrial]:
             conditions=conditions,
             interventions=interventions,
             eligibility_criteria=eligibility_criteria,
-            has_results=has_results
+            has_results=has_results,
+            source="demo",   
+            imported_at=datetime.utcnow(),   
         )
         
         trials.append(trial)

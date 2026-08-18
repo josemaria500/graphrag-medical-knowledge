@@ -1,101 +1,101 @@
-# frontend/graph_visualizer.py
+"""
+Visualizador de grafo usando Streamlit nativo
+"""
+
 import streamlit as st
-from pyvis.network import Network
-import streamlit.components.v1 as components
+import pandas as pd
+import requests
 
 
-# Colores por tipo de nodo
-COLOR_MAP = {
-    "ClinicalTrial": "#3498db",  # Azul
-    "Drug": "#2ecc71",           # Verde
-    "Disease": "#e74c3c",        # Rojo
-    "Biomarker": "#f39c12",      # Naranja
-    "Intervention": "#9b59b6",   # Morado
-}
-
-
-def render_graph(graph_data: dict, height: int = 500, physics: bool = True):
-    """
-    Renderiza un grafo interactivo en Streamlit usando pyvis.
-    
-    Args:
-        graph_data: dict con {"nodes": [...], "links": [...]}
-        height: altura del iframe en píxeles
-        physics: si True, activa la física de repulsión
-    """
-    if not graph_data.get("nodes"):
-        st.warning("No hay datos de grafo para mostrar.")
-        return
-    
-    # Crear red
-    net = Network(height=f"{height}px", width="100%", bgcolor="#ffffff", font_color="#333333")
-    
-    # Añadir nodos
-    for node in graph_data["nodes"]:
-        node_type = node.get("type", "Unknown")
-        color = COLOR_MAP.get(node_type, "#95a5a6")  # Gris por defecto
-        
-        net.add_node(
-            node["id"],
-            label=node.get("label", node["id"]),
-            color=color,
-            title=f"{node_type}: {node['id']}",  # Tooltip al hacer hover
-            size=25 if node_type == "ClinicalTrial" else 20,  # Trials más grandes
-        )
-    
-    # Añadir enlaces
-    for link in graph_data.get("links", []):
-        net.add_edge(
-            link["source"],
-            link["target"],
-            title=link.get("rel", ""),  # Tooltip con tipo de relación
-            label=link.get("rel", ""),  # Etiqueta en la línea
-            color="#bdc3c7",
-            width=2,
-        )
-    
-    # Configurar física
-    if physics:
-        net.set_options("""
-        {
-          "physics": {
-            "enabled": true,
-            "solver": "forceAtlas2Based",
-            "forceAtlas2Based": {
-              "gravitationalConstant": -50,
-              "centralGravity": 0.01,
-              "springLength": 150,
-              "springConstant": 0.08
-            },
-            "stabilization": {
-              "enabled": true,
-              "iterations": 150
-            }
-          }
-        }
-        """)
-    
-    # Generar HTML
-    html_string = net.generate_html()
-    
-    # Incrustar en Streamlit
-    components.html(html_string, height=height, scrolling=True)
-
-
-@st.cache_data(ttl=3600)  # Cache por 1 hora
-def fetch_full_graph(api_url: str) -> dict:
+def fetch_full_graph(api_base: str, limit: int = 200) -> dict:
     """
     Obtiene el grafo completo desde la API.
-    Cacheado para no golpear Neo4j en cada rerun.
     """
-    import requests
-    
     try:
-        graph_url = api_url.replace("/query", "/graph")
-        response = requests.get(graph_url, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        return {"nodes": [], "links": []}
+        response = requests.get(f"{api_base}/graph", params={"limit": limit}, timeout=15)
+        response.raise_for_status()
+        return response.json()
     except Exception as e:
-        st.error(f"Error al cargar el grafo: {e}")
+        st.error(f"Error obteniendo el grafo: {e}")
         return {"nodes": [], "links": []}
+
+
+def render_graph(graph_data: dict, height: int = 600, physics: bool = True):
+    """
+    Renderiza el grafo usando tablas de Streamlit (compatible con CPUs antiguas).
+    
+    Args:
+        graph_data: Dict con 'nodes' y 'links'
+        height: Altura de la visualización (no usado, mantenido por compatibilidad)
+        physics: Si usar física (no usado, mantenido por compatibilidad)
+    """
+    nodes = graph_data.get("nodes", [])
+    links = graph_data.get("links", [])
+    
+    if not nodes:
+        st.info("No hay datos en el grafo.")
+        return
+    
+    st.markdown(f"**{len(nodes)} nodos · {len(links)} relaciones**")
+    
+    # ─── Tabla de nodos ───
+    st.subheader("🔵 Nodos")
+    
+    if nodes:
+        df_nodes = pd.DataFrame([
+            {
+                "ID": node.get("id", ""),
+                "Tipo": node.get("label", node.get("type", "")),
+                "Fuente": node.get("source", "N/A"),
+            }
+            for node in nodes
+        ])
+        st.dataframe(df_nodes, use_container_width=True, hide_index=True)
+    
+    # ─── Tabla de relaciones ───
+    if links:
+        st.subheader("🔗 Relaciones")
+        df_links = pd.DataFrame([
+            {
+                "Origen": link.get("source", ""),
+                "Tipo": link.get("rel", ""),
+                "Destino": link.get("target", ""),
+            }
+            for link in links
+        ])
+        st.dataframe(df_links, use_container_width=True, hide_index=True)
+    
+    # ─── Estadísticas del grafo ───
+    st.subheader("📊 Estadísticas")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # Contar tipos de nodos
+        node_types = {}
+        for node in nodes:
+            label = node.get("label", node.get("type", "Unknown"))
+            node_types[label] = node_types.get(label, 0) + 1
+        st.write("**Tipos de nodos:**")
+        for tipo, count in sorted(node_types.items()):
+            st.write(f"- {tipo}: {count}")
+    
+    with col2:
+        # Contar tipos de relaciones
+        rel_types = {}
+        for link in links:
+            rel = link.get("rel", "Unknown")
+            rel_types[rel] = rel_types.get(rel, 0) + 1
+        st.write("**Tipos de relaciones:**")
+        for tipo, count in sorted(rel_types.items()):
+            st.write(f"- {tipo}: {count}")
+    
+    with col3:
+        # Contar por fuente
+        sources = {}
+        for node in nodes:
+            source = node.get("source", "unknown")
+            sources[source] = sources.get(source, 0) + 1
+        st.write("**Por fuente:**")
+        for fuente, count in sorted(sources.items()):
+            icon = "🔵" if fuente == "demo" else "🟢"
+            st.write(f"- {icon} {fuente}: {count}")

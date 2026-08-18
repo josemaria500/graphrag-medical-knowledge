@@ -1,12 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import date
+from datetime import datetime
+
 
 class Intervention(BaseModel):
     """Representa un fármaco o tratamiento probado en el ensayo."""
     name: str
     intervention_type: Optional[str] = None  # DRUG, BIOLOGICAL, etc.
     description: Optional[str] = None
+
 
 class ClinicalTrial(BaseModel):
     """Representa un ensayo clínico normalizado."""
@@ -18,6 +20,9 @@ class ClinicalTrial(BaseModel):
     eligibility_criteria: Optional[str] = None
     has_results: bool = False
     
+    # ← NUEVOS CAMPOS para etiquetado de origen
+    source: str = Field(default="demo", description="Origen del dato: 'demo' o 'clinicaltrials_api'")
+    imported_at: Optional[datetime] = Field(default=None, description="Fecha de importación al grafo")
+    
     class Config:
-        # Esto permite crear el modelo desde un dict con keys en camelCase
         populate_by_name = True
