@@ -12,7 +12,8 @@ from api_client import (
     clear_imported,
     get_graph_stats,
 )
-from config.settings import MAX_BATCH_SIZE
+
+MAX_BATCH_SIZE = 30
 
 
 def render():
