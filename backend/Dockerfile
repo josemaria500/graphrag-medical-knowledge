@@ -15,10 +15,11 @@ COPY backend/requirements.txt ./backend/requirements.txt
 
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Copiamos únicamente lo necesario para la API
+# Copiamos lo necesario para la API + el frontend que ahora sirve FastAPI
 COPY backend ./backend
 COPY config ./config
 COPY src ./src
+COPY frontend ./frontend
 
 # Aseguramos que Python trate backend y config como paquetes importables
 RUN touch backend/__init__.py config/__init__.py

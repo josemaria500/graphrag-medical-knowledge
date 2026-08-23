@@ -14,20 +14,6 @@ services:
       - graphrag_net
     restart: unless-stopped
 
-  web:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    container_name: graphrag_web
-    environment:
-      - API_URL=http://api:8000/query
-      - STREAMLIT_SERVER_BASE_URL_PATH=graphrag
-    depends_on:
-      - api
-    networks:
-      - graphrag_net
-    restart: unless-stopped
-
   nginx:
     image: nginx:alpine
     container_name: graphrag_nginx
@@ -38,7 +24,6 @@ services:
       - ./nginx/home:/usr/share/nginx/html:ro
     depends_on:
       - api
-      - web
     networks:
       - graphrag_net
     restart: unless-stopped
