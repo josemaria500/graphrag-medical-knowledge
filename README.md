@@ -4,7 +4,7 @@
 
 🔗 **Demo en producción:** [https://josemariagalvez.es](https://josemariagalvez.es)
 - Portfolio → `/`
-- Aplicación (Streamlit + grafo interactivo) → `/graphrag/`
+- Aplicación (FastAPI + Cytoscape.js) → `/api/graphrag/`
 - API (FastAPI + Swagger) → `/api/docs`
 
 ---
@@ -17,8 +17,16 @@ Pipeline **GraphRAG completo** sobre datos reales de ensayos clínicos (Clinical
 2. **Grafo de conocimiento** – Almacenamiento en **Neo4j** con esquema tipado.
 3. **Retrieval** – Traducción de preguntas en lenguaje natural a consultas **Cypher** (query understanding con LLM).
 4. **Generación** – Respuestas fundamentadas con **GPT-4o-mini** (RAG sobre el contexto del grafo).
-5. **Visualización** – Grafo interactivo que reacciona a cada consulta (pyvis).
-6. **Serving** – API FastAPI + frontend Streamlit + home estática de portfolio, todo tras **Nginx** con **HTTPS** (Let's Encrypt) en un VPS, 100 % **Dockerizado**.
+5. **Visualización** – Grafo interactivo con **Cytoscape.js** que reacciona a cada consulta.
+6. **Serving** – API FastAPI sirviendo frontend estático (HTML + JS) + home de portfolio, todo tras **Nginx** con **HTTPS** (Let's Encrypt) en un VPS, 100 % **Dockerizado**.
+
+## 🎯 Funcionalidades clave
+
+- **Búsqueda en tiempo real** en ClinicalTrials.gov con filtro automático de cáncer de mama
+- **Importación de ensayos** con progreso en tiempo real (SSE) y control de capacidad del free tier
+- **Gestión del grafo**: borrar ensayos importados (los demo están protegidos)
+- **Chat RAG** con preguntas precargadas para exploración guiada
+- **Visualización interactiva** del grafo con colores por tipo de nodo
 
 ## 🏗️ Arquitectura
 
@@ -30,17 +38,18 @@ Pipeline **GraphRAG completo** sobre datos reales de ensayos clínicos (Clinical
                  │  proxy + home)      │
                  └──┬────────┬────────┬┘
                     │        │        │
-              /     │   /graphrag/    │   /api/
+              /     │   /api/         │
         (home estática)      │        │
-                    │ ┌──────▼──────┐ │ ┌─────────────┐
-                    │ │  Streamlit  │─┼▶│   FastAPI   │
-                    │ │  (frontend) │   │  (backend)  │
-                    │ └─────────────┘   └──┬───────┬──┘
-                    │                      │       │
-                    │              ┌───────▼──┐ ──▼───────────┐
-                    │              │ Neo4j    │ │ OpenAI       │
-                    │              │ AuraDB   │ │ GPT-4o-mini  │
-                    │              └──────────┘ └──────────────┘
+                    │ ┌──────▼──────────────┐
+                    │ │  FastAPI            │
+                    │ │  (backend +         │
+                    │ │   frontend HTML/JS) │
+                    │ └──────┬──────┬───────┘
+                    │        │      │
+                    │  ┌─────▼──┐ ┌─▼──────────┐
+                    │  │ Neo4j  │ │ OpenAI     │
+                    │  │ AuraDB │ │ GPT-4o-mini│
+                    │  └────────┘ └────────────┘
                     └─ Todo orquestado con Docker Compose
 ```
 
@@ -68,12 +77,27 @@ Pipeline **GraphRAG completo** sobre datos reales de ensayos clínicos (Clinical
 |---|---|---|
 | `/api/health` | GET | Estado del servicio |
 | `/api/graph?limit=200` | GET | Muestra del grafo completo (nodos + enlaces) |
+| `/api/graph/stats` | GET | Estadísticas de capacidad (nodos, relaciones, % límite) |
+| `/api/search?condition=X` | GET | Búsqueda en ClinicalTrials.gov (filtrado por cáncer de mama) |
+| `/api/import` | POST | Importar ensayos por NCT IDs (SSE stream) |
+| `/api/imported-trials` | GET | Listar ensayos importados + demo |
+| `/api/trial/{nct_id}` | DELETE | Borrar ensayo específico (protegido si es demo) |
+| `/api/clear-imported` | POST | Borrar todos los importados (demo protegidos) |
 | `/api/query` | POST | `{question}` → `{answer, graph, query_type}` |
 
 ```bash
+# Búsqueda en ClinicalTrials.gov (gratis, sin LLM)
+curl "https://josemariagalvez.es/api/search?condition=breast+cancer&max_studies=10"
+
+# Consulta RAG con grafo
 curl -X POST https://josemariagalvez.es/api/query \
   -H "Content-Type: application/json" \
   -d '{"question": "¿Qué ensayos clínicos prueban Abemaciclib?"}'
+
+# Importar ensayos con progreso SSE
+curl -N -X POST https://josemariagalvez.es/api/import \
+  -H "Content-Type: application/json" \
+  -d '{"nct_ids": ["NCT01890824", "NCT04258280"]}'
 ```
 
 ## 📊 Evaluación
@@ -126,8 +150,11 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 python main.py
 
-docker compose up --build -d
+# Arrancar el servidor (backend + frontend)
+uvicorn backend.api:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Abre `http://localhost:8000/api/graphrag/` en tu navegador.
 
 ## 🐳 Producción
 
@@ -135,14 +162,16 @@ docker compose up --build -d
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-- **Nginx** sirve la home estática, enruta `/graphrag/` (Streamlit, con WebSockets) y `/api/` (FastAPI).
+- **Nginx** sirve la home estática y enruta `/api/` a FastAPI (que sirve tanto la API como el frontend HTML/JS).
 - **HTTPS** con Let's Encrypt (Certbot + webroot) y renovación automática.
 
 ## 🗂️ Estructura del proyecto
 
 ```text
 ├── backend/            # API FastAPI (Dockerfile, api.py)
-├── frontend/           # Streamlit + visualización pyvis
+├── frontend/           # Frontend estático
+│   ├── templates/      # Plantillas HTML (Jinja2)
+│   └── static/         # CSS, JS, assets (Cytoscape.js)
 ├── nginx/              # Reverse proxy + home del portfolio
 │   └── home/index.html
 ├── config/settings.py  # Carga de configuración (.env)
@@ -161,7 +190,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 ## 🛠️ Stack
 
-`Python` · `FastAPI` · `Streamlit` · `Neo4j (Cypher)` · `OpenAI GPT-4o-mini` · `pyvis` · `Docker` · `Nginx` · `Let's Encrypt` · `Git`
+`Python` · `FastAPI` · `Cytoscape.js` · `Neo4j (Cypher)` · `OpenAI GPT-4o-mini` · `Docker` · `Nginx` · `Let's Encrypt` · `Git`
 
 ## 📬 Contacto
 

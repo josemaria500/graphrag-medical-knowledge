@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GraphRAG - Ensayos Clínicos de Cáncer de Mama</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}">
+    <script src="{{ url_for('static', path='js/cytoscape.min.js') }}"></script>
+</head>
+<body>
+    <header>
+        <h1>🏥 GraphRAG: Ensayos Clínicos</h1>
+        <nav>
+            <button class="tab-btn active" data-tab="graph">🔗 Grafo</button>
+            <button class="tab-btn" data-tab="trials">🧪 Ensayos</button>
+            <button class="tab-btn" data-tab="chat">💬 Chat RAG</button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Pestaña: Grafo -->
+        <section id="tab-graph" class="tab-content active">
+            <div class="graph-controls">
+                <span id="graph-stats">Cargando...</span>
+                <button id="btn-reload">🔄 Recargar</button>
+            </div>
+            <div id="cy"></div>
+        </section>
+
+        <!-- Pestaña: Ensayos Clínicos -->
+        <section id="tab-trials" class="tab-content">
+            <!-- Panel izquierdo: Búsqueda en ClinicalTrials.gov -->
+            <div class="trials-layout">
+                <div class="panel panel-search">
+                    <h2>🔎 Buscar en ClinicalTrials.gov</h2>
+                    <p class="panel-subtitle">Ensayos reales, gratis (sin LLM)</p>
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="Ej: breast cancer, lung cancer...">
+                        <button id="btn-search">🔎 Buscar</button>
+                    </div>
+                    <div id="trials-results"></div>
+                </div>
+
+                <!-- Panel derecho: Ensayos importados al grafo -->
+                <div class="panel panel-imported">
+                    <h2>💾 Ensayos en el Grafo</h2>
+                    <p class="panel-subtitle">Importados desde la API o demo</p>
+                    
+                    <div class="import-actions">
+                        <button id="btn-import-selected" class="btn-primary" disabled>
+                            ⬇️ Importar seleccionados (0)
+                        </button>
+                        <button id="btn-clear-all" class="btn-danger">
+                            🗑️ Borrar todos los importados
+                        </button>
+                    </div>
+
+                    <!-- Progreso de importación SSE -->
+                    <div id="import-progress" class="progress-box" style="display:none;">
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <div id="progress-text">Iniciando...</div>
+                    </div>
+
+                    <!-- Lista de ensayos importados -->
+                    <div id="imported-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pestaña: Chat RAG -->
+        <section id="tab-chat" class="tab-content">
+            <div class="chat-container">
+                <div id="chat-messages"></div>
+                <div class="chat-input">
+                    <input type="text" id="chat-question" placeholder="Haz una pregunta...">
+                    <button id="btn-ask">🚀 Consultar</button>
+                </div>
+                <div class="chat-examples">
+                    <span class="examples-label">💡 Prueba con:</span>
+                    <button class="example-btn">¿Qué fármacos se están probando para cáncer de mama?</button>
+                    <button class="example-btn">¿Qué ensayos clínicos prueban Abemaciclib?</button>
+                    <button class="example-btn">Dame detalles del ensayo NCT02689427</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', path='js/api.js') }}"></script>
+    <script src="{{ url_for('static', path='js/graph.js') }}"></script>
+    <script src="{{ url_for('static', path='js/app.js') }}"></script>
+</body>
+</html>

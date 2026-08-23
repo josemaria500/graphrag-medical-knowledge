@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -6,6 +8,8 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 import json
 import time
+import os
+from pathlib import Path
 
 load_dotenv()
 
@@ -14,6 +18,9 @@ from src.graph.neo4j_repository import Neo4jRepository
 from src.graph.graph_monitor import GraphMonitor
 from src.ingestion.import_service import ImportService
 from config.settings import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, MAX_BATCH_SIZE
+
+# Ruta base del proyecto (para servir archivos estáticos)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 rag_system = None
 
@@ -31,7 +38,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="GraphRAG Medical Knowledge API",
     description="API para consultar ensayos clínicos de cáncer de mama usando GraphRAG con Neo4j",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
     root_path="/api",
 )
@@ -43,6 +50,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ============================================================
+# FRONTEND: Servir archivos estáticos y plantilla HTML
+# ============================================================
+templates = Jinja2Templates(directory=str(BASE_DIR / "frontend" / "templates"))
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "frontend" / "static")), name="static")
+
+
+@app.get("/graphrag/", include_in_schema=False)
+async def frontend_home(request: Request):
+    """Sirve la página principal del frontend (FastAPI + Cytoscape.js)."""
+    return templates.TemplateResponse(request, "index.html")
 
 
 # ─── Modelos existentes ───
@@ -108,6 +127,20 @@ class GraphStatsResponse(BaseModel):
     is_at_limit: bool
 
 
+# ─── Filtro de cáncer de mama (enfoque de la app) ───
+
+BREAST_KEYWORDS = ["breast", "mama", "mammary", "mamaria"]
+
+
+def _is_breast_related(trial_dict: dict) -> bool:
+    """Devuelve True si el ensayo está relacionado con cáncer de mama."""
+    text = " ".join([
+        " ".join(trial_dict.get("conditions") or []),
+        trial_dict.get("title") or "",
+    ]).lower()
+    return any(k in text for k in BREAST_KEYWORDS)
+
+
 # ─── Endpoints existentes ───
 
 @app.get("/health")
@@ -138,16 +171,13 @@ async def query_rag(request: QueryRequest):
         raise HTTPException(status_code=500, detail=f"Error al procesar la pregunta: {str(e)}")
 
 
-# ─── Endpoints nuevos: Importación (Fase 4) ───
+# ─── Endpoints de importación ───
 
 @app.post("/import")
 def import_studies(request: ImportRequest):
     """
     Importa un batch de ensayos clínicos al grafo.
     Devuelve un stream SSE con el progreso en tiempo real.
-    
-    Nota: Endpoint síncrono para que FastAPI lo ejecute en thread pool,
-    evitando bloquear el event loop durante la importación (1-2 min).
     """
     def event_stream():
         repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
@@ -179,7 +209,7 @@ def import_studies(request: ImportRequest):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # ← CRÍTICO: deshabilita buffering de Nginx
+            "X-Accel-Buffering": "no",
         }
     )
 
@@ -224,10 +254,16 @@ async def delete_trial(nct_id: str):
 
 @app.get("/imported-trials", response_model=ImportedTrialsResponse)
 async def list_imported_trials():
-    """Lista todos los ensayos importados (source='clinicaltrials_api')."""
+    """Lista los ensayos importados y los demo (marcados con source)."""
     repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
     try:
-        trials = repo.get_trials_by_source("clinicaltrials_api")
+        imported = repo.get_trials_by_source("clinicaltrials_api")
+        for t in imported:
+            t["source"] = "clinicaltrials_api"
+        demo = repo.get_trials_by_source("demo")
+        for t in demo:
+            t["source"] = "demo"
+        trials = imported + demo
         return ImportedTrialsResponse(trials=trials, count=len(trials))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -252,7 +288,7 @@ async def get_graph_stats():
         repo.close()
 
 
-# ─── Endpoint de búsqueda en ClinicalTrials.gov (para el panel izquierdo) ───
+# ─── Búsqueda en ClinicalTrials.gov con filtro de cáncer de mama ───
 
 @app.get("/search")
 async def search_studies(
@@ -263,7 +299,7 @@ async def search_studies(
 ):
     """
     Busca ensayos en la API de ClinicalTrials.gov (GRATIS, sin LLM).
-    Se usa para poblar el panel izquierdo de la UI.
+    Aplica SIEMPRE el filtro de cáncer de mama (enfoque de la app).
     """
     from src.ingestion.search_service import SearchService
 
@@ -281,10 +317,13 @@ async def search_studies(
             filters=filters if filters else None,
         )
 
-        # Convertir a dicts serializables (ClinicalTrial → dict)
+        # 🎯 Filtro de cáncer de mama: solo se muestran ensayos relevantes
+        trials_dicts = [trial.model_dump() for trial in results]
+        filtered = [t for t in trials_dicts if _is_breast_related(t)]
+
         return {
-            "results": [trial.model_dump() for trial in results],
-            "count": len(results),
+            "results": filtered,
+            "count": len(filtered),
             "condition": condition,
         }
     except Exception as e:
