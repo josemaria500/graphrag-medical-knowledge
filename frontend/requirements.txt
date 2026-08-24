@@ -1,4 +1,0 @@
-# frontend/requirements.txt
-streamlit
-requests
-pyvis
