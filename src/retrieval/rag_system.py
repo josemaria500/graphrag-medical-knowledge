@@ -18,47 +18,67 @@ class GraphRAGSystem:
 
     def get_full_graph(self, limit: int = 200) -> dict:
         """
-        Obtiene el grafo completo (nodos y relaciones) hasta un límite.
-        Usado por el endpoint /api/graph para visualización con Cytoscape.js.
+        Muestrea un subgrafo CONECTADO centrado en ensayos clínicos.
+
+        En vez de muestrear nodos y relaciones por separado (lo que
+        producía nodos aislados), se muestrean ensayos y se traen sus
+        vecinos (fármacos, enfermedades) y vecinos de profundidad 2
+        (biomarcadores), garantizando un grafo conectado.
         """
         driver = self.graph_retriever.driver
         with driver.session() as session:
-            # Obtener nodos
-            nodes_query = """
-            MATCH (n)
-            WHERE n.id IS NOT NULL
-            RETURN n.id AS id, labels(n) AS labels
-            LIMIT $limit
-            """
-            nodes_result = session.run(nodes_query, limit=limit)
-            nodes = []
-            for record in nodes_result:
-                labels = record["labels"]
-                node_type = labels[0] if labels else "Unknown"
-                nodes.append({
-                    "id": record["id"],
-                    "label": node_type,
-                    "type": node_type
-                })
+            # 1) Muestrear ensayos (los hubs del grafo)
+            trials_limit = max(10, limit // 5)
+            trial_ids = [
+                record["id"]
+                for record in session.run(
+                    "MATCH (t:ClinicalTrial) WHERE t.id IS NOT NULL "
+                    "RETURN t.id AS id LIMIT $limit",
+                    limit=trials_limit,
+                )
+            ]
 
-            # Obtener relaciones
-            edges_query = """
-            MATCH (a)-[r]->(b)
-            WHERE a.id IS NOT NULL AND b.id IS NOT NULL
-            RETURN a.id AS source, b.id AS target, type(r) AS rel
-            LIMIT $limit
-            """
-            edges_result = session.run(edges_query, limit=limit * 3)
-            node_ids = {n["id"] for n in nodes}
+            nodes = []
             links = []
-            for record in edges_result:
-                # Solo relaciones cuyos dos extremos existen en la muestra de nodos
-                if record["source"] in node_ids and record["target"] in node_ids:
-                    links.append({
-                        "source": record["source"],
-                        "target": record["target"],
-                        "rel": record["rel"]
-                    })
+            if trial_ids:
+                sub_query = """
+                MATCH (t:ClinicalTrial)
+                WHERE t.id IN $ids
+                OPTIONAL MATCH (t)-[r1]->(n1)
+                OPTIONAL MATCH (n1)-[r2]->(n2)
+                RETURN t.id AS tid, labels(t) AS tlabels,
+                       n1.id AS n1id, labels(n1) AS n1labels,
+                       type(r1) AS rel1,
+                       n2.id AS n2id, labels(n2) AS n2labels,
+                       type(r2) AS rel2
+                """
+                seen_nodes = set()
+                seen_links = set()
+
+                def add_node(nid, labels):
+                    if nid is None or nid in seen_nodes:
+                        return
+                    seen_nodes.add(nid)
+                    node_type = labels[0] if labels else "Unknown"
+                    nodes.append({"id": nid, "label": node_type, "type": node_type})
+
+                def add_link(source, target, rel):
+                    if rel is None:
+                        return
+                    key = (source, target, rel)
+                    if key in seen_links:
+                        return
+                    seen_links.add(key)
+                    links.append({"source": source, "target": target, "rel": rel})
+
+                for record in session.run(sub_query, ids=trial_ids):
+                    add_node(record["tid"], record["tlabels"])
+                    if record["n1id"] is not None and record["rel1"] is not None:
+                        add_node(record["n1id"], record["n1labels"])
+                        add_link(record["tid"], record["n1id"], record["rel1"])
+                        if record["n2id"] is not None and record["rel2"] is not None:
+                            add_node(record["n2id"], record["n2labels"])
+                            add_link(record["n1id"], record["n2id"], record["rel2"])
 
         return {"nodes": nodes, "links": links}
 
