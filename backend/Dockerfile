@@ -26,4 +26,6 @@ RUN touch backend/__init__.py config/__init__.py
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers + --forwarded-allow-ips: uvicorn confía en
+# X-Forwarded-Proto de nginx y genera URLs con https:// (sin mixed content)
+CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

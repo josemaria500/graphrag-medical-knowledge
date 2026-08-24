@@ -49,13 +49,16 @@ class GraphRAGSystem:
             LIMIT $limit
             """
             edges_result = session.run(edges_query, limit=limit * 3)
+            node_ids = {n["id"] for n in nodes}
             links = []
             for record in edges_result:
-                links.append({
-                    "source": record["source"],
-                    "target": record["target"],
-                    "rel": record["rel"]
-                })
+                # Solo relaciones cuyos dos extremos existen en la muestra de nodos
+                if record["source"] in node_ids and record["target"] in node_ids:
+                    links.append({
+                        "source": record["source"],
+                        "target": record["target"],
+                        "rel": record["rel"]
+                    })
 
         return {"nodes": nodes, "links": links}
 
