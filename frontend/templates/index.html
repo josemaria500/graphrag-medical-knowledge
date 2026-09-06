@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GraphRAG - Ensayos Clínicos de Cáncer de Mama</title>
+    <title>GraphRAG - Ensayos Clínicos y Papers de Cáncer de Mama</title>
     <link rel="stylesheet" href="{{ url_for('static', path='css/styles.css') }}">
     <script src="{{ url_for('static', path='js/cytoscape.min.js') }}"></script>
 </head>
 <body>
     <header>
-        <h1>🏥 GraphRAG: Ensayos Clínicos</h1>
+        <h1>🏥 GraphRAG: Ensayos Clínicos y Papers</h1>
         <nav>
-            <button class="tab-btn active" data-tab="graph">🔗 Grafo</button>
+            <button class="tab-btn active" data-tab="graph"> Grafo</button>
             <button class="tab-btn" data-tab="trials">🧪 Ensayos</button>
+            <button class="tab-btn" data-tab="papers">📄 Papers</button>
             <button class="tab-btn" data-tab="chat">💬 Chat RAG</button>
         </nav>
     </header>
@@ -25,11 +26,16 @@
                 <button id="btn-reload">🔄 Recargar</button>
             </div>
             <div id="cy"></div>
+            
+            <!-- Panel flotante de detalles del nodo (Papers, Drugs, etc.) -->
+            <div id="node-details" class="node-details-panel" style="display: none;">
+                <button id="close-details" class="close-details-btn">&times;</button>
+                <div id="node-details-content"></div>
+            </div>
         </section>
 
         <!-- Pestaña: Ensayos Clínicos -->
         <section id="tab-trials" class="tab-content">
-            <!-- Panel izquierdo: Búsqueda en ClinicalTrials.gov -->
             <div class="trials-layout">
                 <div class="panel panel-search">
                     <h2>🔎 Buscar en ClinicalTrials.gov</h2>
@@ -41,9 +47,8 @@
                     <div id="trials-results"></div>
                 </div>
 
-                <!-- Panel derecho: Ensayos importados al grafo -->
                 <div class="panel panel-imported">
-                    <h2>💾 Ensayos en el Grafo</h2>
+                    <h2> Ensayos en el Grafo</h2>
                     <p class="panel-subtitle">Importados desde la API o demo</p>
                     
                     <div class="import-actions">
@@ -51,11 +56,10 @@
                             ⬇️ Importar seleccionados (0)
                         </button>
                         <button id="btn-clear-all" class="btn-danger">
-                            🗑️ Borrar todos los importados
+                            ️ Borrar todos los importados
                         </button>
                     </div>
 
-                    <!-- Progreso de importación SSE -->
                     <div id="import-progress" class="progress-box" style="display:none;">
                         <div class="progress-bar">
                             <div id="progress-fill" class="progress-fill"></div>
@@ -63,25 +67,67 @@
                         <div id="progress-text">Iniciando...</div>
                     </div>
 
-                    <!-- Lista de ensayos importados -->
                     <div id="imported-list"></div>
                 </div>
             </div>
         </section>
 
-        <!-- Pestaña: Chat RAG -->
-        <section id="tab-chat" class="tab-content">
-            <div class="chat-container">
-                <div id="chat-messages"></div>
-                <div class="chat-input">
-                    <input type="text" id="chat-question" placeholder="Haz una pregunta...">
-                    <button id="btn-ask">🚀 Consultar</button>
+        <!-- Pestaña: Papers Científicos -->
+        <section id="tab-papers" class="tab-content">
+            <div class="trials-layout">
+                <!-- Panel izquierdo: Búsqueda en PubMed -->
+                <div class="panel panel-search">
+                    <h2> Buscar en PubMed</h2>
+                    <p class="panel-subtitle">Papers reales, gratis (sin LLM)</p>
+                    <div class="search-box">
+                        <input type="text" id="paper-search-input" placeholder="Ej: Olaparib breast cancer...">
+                        <button id="btn-paper-search">🔎 Buscar</button>
+                    </div>
+                    <div id="paper-search-results"></div>
                 </div>
-                <div class="chat-examples">
-                    <span class="examples-label">💡 Prueba con:</span>
-                    <button class="example-btn">¿Qué fármacos se están probando para cáncer de mama?</button>
-                    <button class="example-btn">¿Qué ensayos clínicos prueban Abemaciclib?</button>
-                    <button class="example-btn">Dame detalles del ensayo NCT02689427</button>
+
+                <!-- Panel derecho: Papers importados al grafo -->
+                <div class="panel panel-imported">
+                    <h2>💾 Papers en el Grafo</h2>
+                    <p class="panel-subtitle">Importados y conectados a entidades</p>
+                    
+                    <div class="import-actions">
+                        <button id="btn-clear-all-papers" class="btn-danger">
+                            🗑️ Borrar todos los papers
+                        </button>
+                    </div>
+
+                    <!-- Lista de papers importados -->
+                    <div id="imported-papers-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pestaña: Chat RAG (con grafo contextual a la derecha) -->
+        <section id="tab-chat" class="tab-content">
+            <div class="chat-layout">
+                <!-- Columna izquierda: Chat -->
+                <div class="chat-container">
+                    <div id="chat-messages"></div>
+                    <div class="chat-input">
+                        <input type="text" id="chat-question" placeholder="Haz una pregunta...">
+                        <button id="btn-ask">🚀 Consultar</button>
+                    </div>
+                    <div class="chat-examples">
+                        <span class="examples-label">💡 Prueba con:</span>
+                        <button class="example-btn">¿Qué fármacos se están probando para cáncer de mama?</button>
+                        <button class="example-btn">¿Qué ensayos clínicos prueban Abemaciclib?</button>
+                        <button class="example-btn">Dame detalles del ensayo NCT02689427</button>
+                        <button class="example-btn">¿Qué papers hablan sobre olaparib y cáncer de mama?</button>
+                    </div>
+                </div>
+                
+                <!-- Columna derecha: Grafo contextual -->
+                <div class="chat-graph-container">
+                    <div class="graph-controls">
+                        <span id="chat-graph-stats">🧠 Grafo contextual</span>
+                    </div>
+                    <div id="cy-chat"></div>
                 </div>
             </div>
         </section>
@@ -90,5 +136,7 @@
     <script src="{{ url_for('static', path='js/api.js') }}"></script>
     <script src="{{ url_for('static', path='js/graph.js') }}"></script>
     <script src="{{ url_for('static', path='js/app.js') }}"></script>
+    <script src="{{ url_for('static', path='js/papers.js') }}"></script>
+    <script src="{{ url_for('static', path='js/chat-graph.js') }}"></script>
 </body>
 </html>

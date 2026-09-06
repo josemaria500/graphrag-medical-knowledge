@@ -6,6 +6,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from src.ingestion.pubmed_client import PubMedClient
+from src.ingestion.paper_extractor import PaperEntityExtractor
 import json
 import time
 import os
@@ -23,6 +25,17 @@ from config.settings import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, MAX_BATCH_SIZ
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 rag_system = None
+
+def _cleanup_orphan_nodes(session) -> int:
+    """Elimina nodos sin relaciones y devuelve la cantidad borrada."""
+    result = session.run("""
+        MATCH (n)
+        WHERE NOT (n)--()
+        WITH n LIMIT 1000
+        DETACH DELETE n
+        RETURN count(n) AS deleted
+    """)
+    return result.single()["deleted"]
 
 
 @asynccontextmanager
@@ -74,6 +87,8 @@ class GraphNode(BaseModel):
     id: str
     label: str
     type: str
+    title: str | None = None    
+    year: str | None = None     
 
 
 class GraphLink(BaseModel):
@@ -125,6 +140,21 @@ class GraphStatsResponse(BaseModel):
     overall_percentage: float
     is_near_limit: bool
     is_at_limit: bool
+
+class IngestPapersRequest(BaseModel):
+    query: str = Field(..., description="Consulta de búsqueda para PubMed (ej: 'Olaparib breast cancer')")
+    max_results: int = Field(default=5, le=10, description="Número máximo de papers a ingerir (máx 10)")
+
+class IngestedPaper(BaseModel):
+    pmid: str
+    title: str
+    nct_ids_found: list[str]
+    url: str
+
+class IngestPapersResponse(BaseModel):
+    status: str
+    message: str
+    papers: list[IngestedPaper]
 
 
 # ─── Filtro de cáncer de mama (enfoque de la app) ───
@@ -223,7 +253,10 @@ async def clear_imported_studies():
     repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
     try:
         deleted = repo.clear_by_source("clinicaltrials_api")
-        return {"status": "ok", "deleted_nodes": deleted}
+        # 🧹 Limpieza automática de huérfanos tras borrar ensayos
+        with repo.driver.session() as session:
+            deleted_orphans = _cleanup_orphan_nodes(session)
+        return {"status": "ok", "deleted_nodes": deleted, "orphans_cleaned": deleted_orphans}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -240,7 +273,14 @@ async def delete_trial(nct_id: str):
     try:
         success = repo.delete_trial(nct_id)
         if success:
-            return DeleteResponse(status="ok", deleted=nct_id)
+            # 🧹 Limpieza automática de huérfanos tras borrar un ensayo
+            with repo.driver.session() as session:
+                deleted_orphans = _cleanup_orphan_nodes(session)
+            return DeleteResponse(
+                status="ok", 
+                deleted=nct_id, 
+                message=f"Se limpiaron {deleted_orphans} nodos huérfanos"
+            )
         else:
             return DeleteResponse(
                 status="error",
@@ -271,17 +311,29 @@ async def list_imported_trials():
         repo.close()
 
 
-@app.get("/graph/stats", response_model=GraphStatsResponse)
+@app.get("/graph/stats")
 async def get_graph_stats():
-    """
-    Devuelve estadísticas de capacidad del grafo.
-    Útil para el monitor de límite de Neo4j Aura Free.
-    """
+    """Devuelve estadísticas básicas del grafo."""
     repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
     try:
-        monitor = GraphMonitor(repo)
-        status = monitor.get_status()
-        return GraphStatsResponse(**status)
+        stats = repo.get_stats()
+        NODE_LIMIT = 20000
+        REL_LIMIT = 40000
+
+        node_count = stats.get("node_count", 0)
+        rel_count = stats.get("rel_count", 0)
+        
+        return {
+            "node_count": node_count,
+            "rel_count": rel_count,
+            "node_limit": NODE_LIMIT,
+            "rel_limit": REL_LIMIT,
+            "node_percentage": round((node_count / NODE_LIMIT) * 100, 2) if NODE_LIMIT > 0 else 0,
+            "rel_percentage": round((rel_count / REL_LIMIT) * 100, 2) if REL_LIMIT > 0 else 0,
+            "overall_percentage": round(((node_count + rel_count) / (NODE_LIMIT + REL_LIMIT)) * 100, 2),
+            "is_near_limit": node_count > NODE_LIMIT * 0.8 or rel_count > REL_LIMIT * 0.8,
+            "is_at_limit": node_count >= NODE_LIMIT or rel_count >= REL_LIMIT,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -328,6 +380,162 @@ async def search_studies(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/ingest/papers", response_model=IngestPapersResponse)
+async def ingest_papers_on_demand(request: IngestPapersRequest):
+    """
+    Busca papers en PubMed bajo demanda, extrae entidades y los guarda en Neo4j.
+    Permite al usuario ampliar la base de conocimientos dinámicamente.
+    """
+    try:
+        pubmed = PubMedClient()
+        extractor = PaperEntityExtractor()
+        repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
+        
+        # 1. Buscar papers
+        papers = pubmed.search_papers(request.query, max_results=request.max_results)
+        if not papers:
+            raise HTTPException(status_code=404, detail="No se encontraron papers para esta consulta en PubMed.")
+        
+        ingested = []
+        
+        # 2. Procesar y guardar cada paper
+        for p in papers:
+            entities = extractor.extract_entities(p["abstract"])
+            repo.save_paper_with_relations(p, entities)
+            
+            ingested.append(IngestedPaper(
+                pmid=p["pmid"],
+                title=p["title"],
+                nct_ids_found=entities.get("nct_ids", []),
+                url=f"https://pubmed.ncbi.nlm.nih.gov/{p['pmid']}/"
+            ))
+            
+        repo.close()
+        
+        return IngestPapersResponse(
+            status="success",
+            message=f"Se ingestaron {len(ingested)} papers correctamente en el grafo.",
+            papers=ingested
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error durante la ingesta: {str(e)}")
+
+
+@app.post("/ingest/paper/{pmid}")
+async def ingest_single_paper(pmid: str):
+    """Importa un paper específico en el grafo usando su PMID."""
+    try:
+        pubmed = PubMedClient()
+        extractor = PaperEntityExtractor()
+        repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
+        
+        # Buscar específicamente por PMID en PubMed
+        papers = pubmed.search_papers(f"{pmid}[pmid]", max_results=1)
+        if not papers:
+            raise HTTPException(status_code=404, detail="Paper no encontrado en PubMed.")
+        
+        p = papers[0]
+        entities = extractor.extract_entities(p.get("abstract", ""))
+        repo.save_paper_with_relations(p, entities)
+        repo.close()
+        
+        return {"status": "success", "message": f"Paper {pmid} importado correctamente."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/search-papers")
+async def search_papers(query: str, max_results: int = 10):
+    """Busca papers en PubMed sin importarlos aún (para previsualizar en la UI)."""
+    try:
+        client = PubMedClient()
+        papers = client.search_papers(query, max_results=min(max_results, 50))
+        return {"results": papers, "count": len(papers)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/papers")
+async def list_papers():
+    """Lista todos los papers importados en el grafo."""
+    repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
+    try:
+        with repo.driver.session() as session:
+            result = session.run("""
+                MATCH (p:Paper)
+                RETURN p.pmid AS pmid, p.title AS title, p.year AS year, p.journal AS journal, p.url AS url
+                ORDER BY p.year DESC
+            """)
+            papers = [record.data() for record in result]
+        return {"papers": papers, "count": len(papers)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        repo.close()
+
+
+@app.delete("/paper/{pmid}")
+async def delete_paper(pmid: str):
+    """Borra un paper específico del grafo."""
+    repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
+    try:
+        with repo.driver.session() as session:
+            session.run("MATCH (p:Paper {pmid: $pmid}) DETACH DELETE p", pmid=pmid)
+            # 🧹 Limpieza automática de huérfanos tras borrar un paper
+            deleted_orphans = _cleanup_orphan_nodes(session)
+        return {"status": "ok", "deleted": pmid, "orphans_cleaned": deleted_orphans}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        repo.close()
+
+
+@app.delete("/papers")
+async def delete_all_papers():
+    """Borra todos los papers del grafo."""
+    repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
+    try:
+        with repo.driver.session() as session:
+            result = session.run("MATCH (p:Paper) DETACH DELETE p RETURN count(p) AS deleted")
+            deleted = result.single()["deleted"]
+            # 🧹 Limpieza automática de huérfanos tras borrar todos los papers
+            deleted_orphans = _cleanup_orphan_nodes(session)
+        return {"status": "ok", "deleted": deleted, "orphans_cleaned": deleted_orphans}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        repo.close()
+
+
+@app.delete("/cleanup/orphans")
+async def cleanup_orphan_nodes():
+    """
+    Elimina todos los nodos huérfanos (sin relaciones) del grafo.
+    Endpoint manual por si se necesita una limpieza explícita.
+    """
+    repo = Neo4jRepository(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
+    try:
+        with repo.driver.session() as session:
+            result = session.run("""
+                MATCH (n)
+                WHERE NOT (n)--()
+                WITH n LIMIT 1000
+                DETACH DELETE n
+                RETURN count(n) AS deleted
+            """)
+            deleted = result.single()["deleted"]
+        return {"status": "ok", "deleted": deleted, "message": f"Se eliminaron {deleted} nodos huérfanos"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        repo.close()
 
 
 @app.get("/study/{nct_id}")

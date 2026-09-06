@@ -11,35 +11,34 @@ class ResponseGenerator:
     
 
     def generate(self, question: str, context: dict) -> str:
-        """
-        Genera una respuesta usando el contexto extraído del grafo.
-        """
-        formatted_context = self._format_context(context)
-        
-        prompt = f"""
-    Eres un asistente experto en ensayos clínicos de cáncer de mama.
+        papers = context.get('papers', [])
+        papers_text = ""
+        if papers:
+            papers_text = "\n\nPAPERS CIENTÍFICOS DISPONIBLES:\n"
+            for p in papers:
+                abstract_preview = (p.get('abstract') or '')[:300]
+                papers_text += f"- [{p['pmid']}] {p['title']} ({p['year']}): {abstract_preview}...\n  URL: {p['url']}\n"
 
-    ## INFORMACIÓN DISPONIBLE DEL GRAFO DE CONOCIMIENTO:
-    {formatted_context}
+        prompt = f"""Eres un asistente médico experto. Responde basándote en el contexto del grafo proporcionado.
 
-    ## PREGUNTA DEL USUARIO:
-    {question}
+REGLAS DE CITACIÓN:
+- Si hay papers en el contexto, DEBES citarlos usando formato markdown: [Título del paper](URL)
+- Incluye al final una sección "📚 Referencias:" con todos los papers citados.
+- Si no hay papers, responde normalmente sin inventar citas.
+- Sé conciso y basado en evidencia.
 
-    ## INSTRUCCIONES:
-    1. La información del grafo es TU ÚNICA fuente de verdad
-    2. Si el grafo contiene datos relevantes (fármacos, ensayos, detalles), ÚSALOS para responder
-    3. Solo responde "No tengo información suficiente" si la sección relevante del grafo está vacía
-    4. Sé específico y menciona IDs, nombres, estados, etc.
+CONTEXTO DEL GRAFO:
+{context}
+{papers_text}
 
-    ## RESPUESTA:
-    """
-        
+PREGUNTA DEL USUARIO:
+{question}
+"""
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            temperature=0.3,
         )
-        
         return response.choices[0].message.content
     
 

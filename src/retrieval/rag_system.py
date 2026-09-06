@@ -2,11 +2,8 @@ from .graph_retriever import GraphRetriever
 from .generator import ResponseGenerator
 from .query_understanding import QueryUnderstanding
 
-
 class GraphRAGSystem:
-    """
-    Sistema principal de GraphRAG que orquesta retrieval y generación.
-    """
+    """Sistema principal de GraphRAG que orquesta retrieval y generación."""
 
     def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str):
         self.graph_retriever = GraphRetriever(neo4j_uri, neo4j_user, neo4j_password)
@@ -17,186 +14,214 @@ class GraphRAGSystem:
         self.graph_retriever.close()
 
     def get_full_graph(self, limit: int = 200) -> dict:
-        """
-        Muestrea un subgrafo CONECTADO centrado en ensayos clínicos.
-
-        En vez de muestrear nodos y relaciones por separado (lo que
-        producía nodos aislados), se muestrean ensayos y se traen sus
-        vecinos (fármacos, enfermedades) y vecinos de profundidad 2
-        (biomarcadores), garantizando un grafo conectado.
-        """
+        """Muestrea un subgrafo conectado incluyendo Papers, Biomarkers, Outcomes, AdverseEvents, etc."""
         driver = self.graph_retriever.driver
         with driver.session() as session:
-            # 1) Muestrear ensayos (los hubs del grafo)
-            trials_limit = max(10, limit // 5)
-            trial_ids = [
-                record["id"]
-                for record in session.run(
-                    "MATCH (t:ClinicalTrial) WHERE t.id IS NOT NULL "
-                    "RETURN t.id AS id LIMIT $limit",
-                    limit=trials_limit,
-                )
-            ]
+            # Consulta actualizada para incluir Outcome y AdverseEvent
+            query_ids = """
+            MATCH (n)
+            WHERE n:ClinicalTrial OR n:Paper OR n:Drug OR n:Biomarker 
+                OR n:Outcome OR n:AdverseEvent OR n:Disease OR n:Intervention
+            RETURN n.id AS id, labels(n)[0] AS label, n.title AS title, n.year AS year
+            LIMIT $limit
+            """
+            records = session.run(query_ids, limit=limit).data()
+            nodes, links, seen_nodes, seen_links = [], [], set(), set()
 
-            nodes = []
-            links = []
-            if trial_ids:
-                sub_query = """
-                MATCH (t:ClinicalTrial)
-                WHERE t.id IN $ids
-                OPTIONAL MATCH (t)-[r1]->(n1)
-                OPTIONAL MATCH (n1)-[r2]->(n2)
-                RETURN t.id AS tid, labels(t) AS tlabels,
-                       n1.id AS n1id, labels(n1) AS n1labels,
-                       type(r1) AS rel1,
-                       n2.id AS n2id, labels(n2) AS n2labels,
-                       type(r2) AS rel2
-                """
-                seen_nodes = set()
-                seen_links = set()
+            def add_node(nid, nlabel, title=None, year=None):
+                if nid is None: 
+                    return
+                if nid in seen_nodes:
+                    for node in nodes:
+                        if node["id"] == nid:
+                            if title and not node.get("title"): 
+                                node["title"] = title
+                            if year and not node.get("year"): 
+                                node["year"] = str(year)
+                            break
+                    return
+                seen_nodes.add(nid)
+                node_data = {"id": nid, "label": nlabel, "type": nlabel}
+                if title: 
+                    node_data["title"] = title
+                if year: 
+                    node_data["year"] = str(year)
+                nodes.append(node_data)
 
-                def add_node(nid, labels):
-                    if nid is None or nid in seen_nodes:
-                        return
-                    seen_nodes.add(nid)
-                    node_type = labels[0] if labels else "Unknown"
-                    nodes.append({"id": nid, "label": node_type, "type": node_type})
-
-                def add_link(source, target, rel):
-                    if rel is None:
-                        return
-                    key = (source, target, rel)
-                    if key in seen_links:
-                        return
-                    seen_links.add(key)
+            def add_link(source, target, rel):
+                if not rel or not source or not target: 
+                    return
+                if (source, target, rel) not in seen_links:
+                    seen_links.add((source, target, rel))
                     links.append({"source": source, "target": target, "rel": rel})
 
-                for record in session.run(sub_query, ids=trial_ids):
-                    add_node(record["tid"], record["tlabels"])
-                    if record["n1id"] is not None and record["rel1"] is not None:
-                        add_node(record["n1id"], record["n1labels"])
-                        add_link(record["tid"], record["n1id"], record["rel1"])
-                        if record["n2id"] is not None and record["rel2"] is not None:
-                            add_node(record["n2id"], record["n2labels"])
-                            add_link(record["n1id"], record["n2id"], record["rel2"])
+            for record in records:
+                add_node(record["id"], record["label"], record["title"], record["year"])
+                neighbor_query = """
+                MATCH (root {id: $root_id})-[r]-(neighbor)
+                RETURN root.id AS root_id, labels(root)[0] AS root_label,
+                       neighbor.id AS n_id, labels(neighbor)[0] AS n_label,
+                       neighbor.title AS n_title, neighbor.year AS n_year,
+                       type(r) AS rel_type, startNode(r).id AS source_id, endNode(r).id AS target_id
+                LIMIT 50
+                """
+                for n_record in session.run(neighbor_query, root_id=record["id"]):
+                    add_node(n_record["n_id"], n_record["n_label"], n_record["n_title"], n_record["n_year"])
+                    add_link(n_record["source_id"], n_record["target_id"], n_record["rel_type"])
+            
+            return {"nodes": nodes, "links": links}
 
-        return {"nodes": nodes, "links": links}
-
+        
     def ask(self, question: str) -> str:
-        """
-        Responde una pregunta usando GraphRAG.
-        """
-        # Paso 1: Entender la pregunta con LLM
+        """Responde una pregunta usando GraphRAG."""
         print(f"  [DEBUG] Entendiendo pregunta...")
         entities = self.query_understanding.extract_entities(question)
         print(f"  [DEBUG] Entidades extraídas: {entities}")
 
-        # Paso 2: Ejecutar la query apropiada según el tipo
         context = {}
         query_type = entities.get('query_type')
 
         if query_type == 'drugs_for_disease' and entities.get('disease'):
             context['drugs'] = self.graph_retriever.find_drugs_for_disease(entities['disease'])
             context['query_entity'] = f"Enfermedad: {entities['disease']}"
+            
         elif query_type == 'trials_for_drug' and entities.get('drug'):
             context['trials'] = self.graph_retriever.find_trials_for_drug(entities['drug'])
             context['query_entity'] = f"Fármaco buscado: {entities['drug']}"
+            
         elif query_type == 'trial_details' and entities.get('nct_id'):
             context['trial'] = self.graph_retriever.get_trial_details(entities['nct_id'])
             context['query_entity'] = f"Ensayo: {entities['nct_id']}"
+            if context['trial'] and context['trial'].get('papers'):
+                context['trial_papers'] = context['trial']['papers']
+                
         elif query_type == 'drugs_for_trial' and entities.get('nct_id'):
             context['drugs_in_trial'] = self.graph_retriever.find_drugs_for_trial(entities['nct_id'])
             context['query_entity'] = f"Ensayo: {entities['nct_id']}"
+            
         elif query_type == 'biomarkers_for_drug' and entities.get('drug'):
             context['biomarkers'] = self.graph_retriever.find_biomarkers_for_drug(entities['drug'])
             context['query_entity'] = f"Fármaco: {entities['drug']}"
+            
+        elif query_type == 'papers_for_trial' and entities.get('nct_id'):
+            context['papers'] = self.graph_retriever.find_papers_for_trial(entities['nct_id'])
+            context['query_entity'] = f"Ensayo: {entities['nct_id']}"
+            
+        elif query_type == 'papers_for_drug_disease' and entities.get('drug') and entities.get('disease'):
+            context['papers'] = self.graph_retriever.find_papers_for_drug_and_disease(
+                entities['drug'], entities['disease']
+            )
+            context['query_entity'] = f"Fármaco: {entities['drug']}, Enfermedad: {entities['disease']}"
+            
+        # 🆕 NUEVO: Exploración completa de una entidad
+        elif query_type == 'entity_exploration' and entities.get('entity_id'):
+            context['entity_info'] = self.graph_retriever.get_complete_entity_info(
+                entities['entity_id'], 
+                entities.get('entity_type')
+            )
+            context['query_entity'] = f"Entidad: {entities['entity_id']} ({entities.get('entity_type', 'Desconocido')})"
+            
         else:
-            context['message'] = "No se pudieron extraer entidades específicas de la pregunta."
+            context['message'] = "No se pudieron extraer entidades específicas de la pregunta o el tipo de consulta no es reconocido."
 
         print(f"  [DEBUG] Contexto del grafo: {context}")
-
-        # Paso 3: Generar respuesta
         return self.generator.generate(question, context)
 
+    
     def ask_with_graph(self, question: str) -> dict:
-        """
-        Responde una pregunta y devuelve el subgrafo asociado.
-        Usado por el endpoint /api/query para mostrar grafo en la UI.
-        """
-        # Obtener respuesta textual
+        """Responde una pregunta y devuelve el subgrafo asociado para visualizar."""
         answer = self.ask(question)
-
-        # Obtener subgrafo relacionado con la pregunta
         entities = self.query_understanding.extract_entities(question)
         graph_data = {"nodes": [], "links": []}
 
         try:
             driver = self.graph_retriever.driver
             with driver.session() as session:
-                # Buscar nodos relacionados con las entidades extraídas
                 nct_id = entities.get('nct_id')
-                drug = entities.get('drug')
-                disease = entities.get('disease')
+                # Si es entity_exploration, usamos entity_id como fallback
+                drug = entities.get('drug') or (entities.get('entity_id') if entities.get('entity_type') == 'Drug' else None)
+                disease = entities.get('disease') or (entities.get('entity_id') if entities.get('entity_type') == 'Disease' else None)
+                entity_id = entities.get('entity_id')
 
+                seen_nodes = set()
+                nodes = []
+                links = []
+
+                def add_node(nid, nlabel, ntitle, nyear):
+                    if nid and nid not in seen_nodes:
+                        seen_nodes.add(nid)
+                        node_data = {"id": nid, "label": nlabel, "type": nlabel}
+                        if nlabel == "Paper" and ntitle:
+                            node_data["title"] = ntitle
+                            node_data["year"] = str(nyear) if nyear else "N/A"
+                        nodes.append(node_data)
+
+                # PASO 1: Obtener el nodo central y sus vecinos directos
+                query_main = """
+                MATCH (center)
+                WHERE ($nct_id IS NOT NULL AND center.id = $nct_id)
+                   OR ($drug IS NOT NULL AND toLower(center.id) CONTAINS toLower($drug))
+                   OR ($disease IS NOT NULL AND (
+                       toLower(center.id) CONTAINS toLower($disease)
+                       OR toLower(center.id) CONTAINS 'breast'
+                       OR toLower(center.id) CONTAINS 'cancer'
+                   ))
+                   OR ($entity_id IS NOT NULL AND toLower(center.id) CONTAINS toLower($entity_id))
+                OPTIONAL MATCH (center)-[r]-(neighbor)
+                RETURN center.id AS c_id, labels(center)[0] AS c_label, center.title AS c_title, toString(center.year) AS c_year,
+                       neighbor.id AS n_id, labels(neighbor)[0] AS n_label, neighbor.title AS n_title, toString(neighbor.year) AS n_year,
+                       type(r) AS rel_type, startNode(r).id AS source_id, endNode(r).id AS target_id
+                LIMIT 200
+                """
+                result_main = session.run(query_main, nct_id=nct_id, drug=drug, disease=disease, entity_id=entity_id)
+                
+                for record in result_main:
+                    add_node(record["c_id"], record["c_label"], record["c_title"], record["c_year"])
+                    
+                    if record["n_id"]:
+                        add_node(record["n_id"], record["n_label"], record["n_title"], record["n_year"])
+                        if record["rel_type"] and record["source_id"] and record["target_id"]:
+                            links.append({
+                                "source": record["source_id"],
+                                "target": record["target_id"],
+                                "rel": record["rel_type"]
+                            })
+
+                # PASO 2: Si el nodo central es un ensayo, buscar papers relacionados indirectamente
+                indirect_papers = []
                 if nct_id:
-                    query = """
-                    MATCH (t:ClinicalTrial {id: $nct_id})
-                    OPTIONAL MATCH (t)-[r]-(related)
-                    RETURN t, r, related
-                    LIMIT 50
+                    query_papers = """
+                    MATCH (t:ClinicalTrial {id: $nct_id})-[:TESTS|:STUDIES]-(mid)
+                    MATCH (p:Paper)-[:EVALUATES|:STUDIES]-(mid)
+                    WHERE NOT (p)-[:PUBLISHES_RESULTS_OF]->(t)
+                    RETURN DISTINCT p.id AS p_id, p.title AS p_title, toString(p.year) AS p_year
                     """
-                    result = session.run(query, nct_id=nct_id)
-                elif drug:
-                    query = """
-                    MATCH (d:Drug) WHERE d.id CONTAINS $drug
-                    OPTIONAL MATCH (d)-[r]-(related)
-                    RETURN d, r, related
-                    LIMIT 50
-                    """
-                    result = session.run(query, drug=drug)
-                elif disease:
-                    query = """
-                    MATCH (dis:Disease) WHERE dis.id CONTAINS $disease
-                    OPTIONAL MATCH (dis)-[r]-(related)
-                    RETURN dis, r, related
-                    LIMIT 50
-                    """
-                    result = session.run(query, disease=disease)
-                else:
-                    result = None
+                    result_papers = session.run(query_papers, nct_id=nct_id)
+                    for prec in result_papers:
+                        add_node(prec["p_id"], "Paper", prec["p_title"], prec["p_year"])
+                        indirect_papers.append(prec["p_id"])
 
-                if result:
-                    seen_nodes = set()
-                    nodes = []
-                    links = []
-                    for record in result:
-                        for key in ['t', 'd', 'dis', 'related']:
-                            node = record.get(key)
-                            if node and hasattr(node, 'id'):
-                                node_id = node.get('id')
-                                if node_id and node_id not in seen_nodes:
-                                    seen_nodes.add(node_id)
-                                    labels = list(node.labels)
-                                    node_type = labels[0] if labels else "Unknown"
-                                    nodes.append({
-                                        "id": node_id,
-                                        "label": node_type,
-                                        "type": node_type
-                                    })
-                        rel = record.get('r')
-                        if rel:
-                            try:
-                                source = rel.start_node.get('id')
-                                target = rel.end_node.get('id')
-                                if source and target:
+                    # PASO 3: Obtener las relaciones de esos papers indirectos
+                    if indirect_papers:
+                        query_paper_rels = """
+                        MATCH (p:Paper) WHERE p.id IN $paper_ids
+                        OPTIONAL MATCH (p)-[r]-(neighbor)
+                        RETURN p.id AS p_id, neighbor.id AS n_id, labels(neighbor)[0] AS n_label, 
+                               neighbor.title AS n_title, toString(neighbor.year) AS n_year,
+                               type(r) AS rel_type, startNode(r).id AS source_id, endNode(r).id AS target_id
+                        """
+                        result_rels = session.run(query_paper_rels, paper_ids=list(set(indirect_papers)))
+                        for rel_rec in result_rels:
+                            if rel_rec["n_id"]:
+                                add_node(rel_rec["n_id"], rel_rec["n_label"], rel_rec["n_title"], rel_rec["n_year"])
+                                if rel_rec["rel_type"] and rel_rec["source_id"] and rel_rec["target_id"]:
                                     links.append({
-                                        "source": source,
-                                        "target": target,
-                                        "rel": rel.type
+                                        "source": rel_rec["source_id"],
+                                        "target": rel_rec["target_id"],
+                                        "rel": rel_rec["rel_type"]
                                     })
-                            except:
-                                pass
-                    graph_data = {"nodes": nodes, "links": links}
+
+                graph_data = {"nodes": nodes, "links": links}
         except Exception as e:
             print(f"  [WARN] Error obteniendo subgrafo: {e}")
 

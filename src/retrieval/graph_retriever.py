@@ -2,10 +2,8 @@ from typing import Any
 from neo4j import GraphDatabase
 
 class GraphRetriever:
-    """
-    Traduce preguntas en consultas Cypher al grafo.
-    """
-    
+    """Traduce preguntas en consultas Cypher al grafo."""
+
     def __init__(self, uri: str, user: str, password: str):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
     
@@ -13,181 +11,189 @@ class GraphRetriever:
         self.driver.close()
     
     def find_drugs_for_disease(self, disease_name: str) -> list[dict]:
-        """
-        Encuentra todos los fármacos que se están probando para una enfermedad.
-        Query: (Trial)-[:TESTS]->(Drug) y (Trial)-[:STUDIES]->(Disease)
-        """
+        """Encuentra todos los fármacos que se están probando para una enfermedad."""
+        # Mapeo básico de términos en español a inglés
+        disease_mapping = {
+            "cáncer de mama": "breast",
+            "cancer de mama": "breast",
+            "mama": "breast",
+            "cáncer": "cancer",
+            "cancer": "cancer"
+        }
+        
+        # Buscar término en inglés si es posible
+        search_term = disease_name.lower()
+        for spanish, english in disease_mapping.items():
+            if spanish in search_term:
+                search_term = english
+                break
+        
         query = """
         MATCH (t:ClinicalTrial)-[:TESTS]->(d:Drug),
               (t)-[:STUDIES]->(dis:Disease)
-        WHERE dis.id CONTAINS $disease_name
+        WHERE toLower(dis.id) CONTAINS toLower($disease_name)
+           OR toLower(dis.id) CONTAINS $search_term
         RETURN DISTINCT d.id AS drug, t.id AS trial
         """
-        
         with self.driver.session() as session:
-            result = session.run(query, disease_name=disease_name)
+            result = session.run(query, disease_name=disease_name, search_term=search_term)
             return [record.data() for record in result]
     
     def find_trials_for_drug(self, drug_name: str) -> list[dict]:
-        """
-        Encuentra todos los ensayos que prueban un fármaco específico.
-        """
         query = """
         MATCH (t:ClinicalTrial)-[:TESTS]->(d:Drug)
-        WHERE d.id CONTAINS $drug_name
+        WHERE toLower(d.id) CONTAINS toLower($drug_name)
         RETURN t.id AS trial_id, t.title AS title, t.status AS status
         """
-        
         with self.driver.session() as session:
             result = session.run(query, drug_name=drug_name)
             return [record.data() for record in result]
     
     def find_biomarkers_for_drug(self, drug_name: str) -> list[str]:
-        """
-        Encuentra qué biomarcadores targetea un fármaco.
-        """
         query = """
-        MATCH (d:Drug {id: $drug_name})-[:TARGETS]->(b:Biomarker)
+        MATCH (d:Drug)-[:TARGETS]->(b:Biomarker)
+        WHERE toLower(d.id) CONTAINS toLower($drug_name)
         RETURN b.id AS biomarker
         """
-        
         with self.driver.session() as session:
             result = session.run(query, drug_name=drug_name)
             return [record['biomarker'] for record in result]
     
     def get_trial_details(self, nct_id: str) -> dict:
         """
-        Obtiene todos los detalles de un ensayo clínico.
+        Obtiene todos los detalles de un ensayo clínico, incluyendo papers relacionados
+        directa (PUBLISHES_RESULTS_OF) o indirectamente (a través de fármacos/enfermedades).
         """
-        query = """
-        MATCH (t:ClinicalTrial {id: $nct_id})
-        OPTIONAL MATCH (t)-[:TESTS]->(d:Drug|Intervention)
-        OPTIONAL MATCH (t)-[:STUDIES]->(dis:Disease)
-        RETURN t.id AS id, t.title AS title, t.status AS status,
-               collect(DISTINCT d.id) AS treatments,
-               collect(DISTINCT dis.id) AS diseases
-        """
-        
         with self.driver.session() as session:
-            result = session.run(query, nct_id=nct_id)
-            record = result.single()
-            return record.data() if record else None
-
+            # Consulta 1: Datos básicos del ensayo + papers directos
+            query1 = """
+            MATCH (t:ClinicalTrial {id: $nct_id})
+            OPTIONAL MATCH (t)-[:TESTS]->(d:Drug|Intervention)
+            OPTIONAL MATCH (t)-[:STUDIES]->(dis:Disease)
+            OPTIONAL MATCH (p:Paper)-[:PUBLISHES_RESULTS_OF]->(t)
+            RETURN t.id AS id, t.title AS title, t.status AS status,
+                   collect(DISTINCT d.id) AS treatments,
+                   collect(DISTINCT dis.id) AS diseases,
+                   collect(DISTINCT {
+                       pmid: p.pmid, 
+                       title: p.title, 
+                       year: p.year,
+                       relation_type: 'direct'
+                   }) AS direct_papers
+            """
+            result1 = session.run(query1, nct_id=nct_id)
+            record1 = result1.single()
+            
+            if not record1:
+                return None
+            
+            data = record1.data()
+            # Filtrar papers directos nulos
+            direct_papers = [p for p in data['direct_papers'] if p['pmid'] is not None]
+            
+            # Consulta 2: Papers indirectos (a través de fármacos o enfermedades)
+            query2 = """
+            MATCH (t:ClinicalTrial {id: $nct_id})-[:TESTS|:STUDIES]-(entity)
+            MATCH (p:Paper)-[:EVALUATES|:STUDIES]-(entity)
+            WHERE NOT (p)-[:PUBLISHES_RESULTS_OF]->(t)
+            RETURN DISTINCT p.pmid AS pmid, p.title AS title, p.year AS year
+            """
+            result2 = session.run(query2, nct_id=nct_id)
+            indirect_papers = [
+                {
+                    'pmid': record['pmid'],
+                    'title': record['title'],
+                    'year': record['year'],
+                    'relation_type': 'indirect'
+                }
+                for record in result2
+                if record['pmid'] is not None
+            ]
+            
+            # Combinar ambos tipos de papers
+            data['papers'] = direct_papers + indirect_papers
+            del data['direct_papers']
+            
+            return data
+    
     def find_drugs_for_trial(self, nct_id: str) -> list[dict]:
-        """
-        Encuentra todos los fármacos que se prueban en un ensayo específico.
-        """
         query = """
         MATCH (t:ClinicalTrial {id: $nct_id})-[:TESTS]->(d:Drug)
         RETURN d.id AS drug
         """
-        
         with self.driver.session() as session:
             result = session.run(query, nct_id=nct_id)
             return [record.data() for record in result]
 
-    # =========================================================
-    # Métodos para visualización del grafo
-    # =========================================================
-
-    def get_full_graph(self, limit: int = 200) -> dict:
-        """Devuelve una muestra del grafo completo (nodos + enlaces)."""
+    def find_papers_for_drug_and_disease(self, drug_name: str, disease_name: str) -> list[dict]:
         query = """
-        MATCH (a)-[r]->(b)
-        RETURN a.id AS source, labels(a)[0] AS source_type,
-               type(r) AS rel,
-               b.id AS target, labels(b)[0] AS target_type
-        LIMIT $limit
+        MATCH (p:Paper)-[:EVALUATES]->(d:Drug)
+        MATCH (p)-[:STUDIES]->(dis:Disease)
+        WHERE toLower(d.id) CONTAINS toLower($drug_name) 
+          AND toLower(dis.id) CONTAINS toLower($disease_name)
+        RETURN p.pmid AS pmid, p.title AS title, p.year AS year, p.url AS url, p.abstract AS abstract
+        LIMIT 5
         """
         with self.driver.session() as session:
-            rows = [record.data() for record in session.run(query, limit=limit)]
-        return self._triples_to_graph(rows)
+            result = session.run(query, drug_name=drug_name, disease_name=disease_name)
+            return [record.data() for record in result]
 
-    def get_subgraph_for_query(self, query_type: str, entities: dict) -> dict:
-        """Devuelve el subgrafo asociado a una pregunta ya entendida."""
-        if query_type == "drugs_for_disease" and entities.get("disease"):
-            return self._subgraph_disease(entities["disease"])
-        if query_type in ("trials_for_drug", "biomarkers_for_drug") and entities.get("drug"):
-            return self._subgraph_drug(entities["drug"])
-        if query_type in ("trial_details", "drugs_for_trial") and entities.get("nct_id"):
-            return self._subgraph_trial(entities["nct_id"])
-        return {"nodes": [], "links": []}
-
-    def _subgraph_disease(self, disease: str) -> dict:
+    def find_papers_for_trial(self, nct_id: str) -> list[dict]:
         query = """
-        MATCH (t:ClinicalTrial)-[:STUDIES]->(dis:Disease)
-        WHERE dis.id CONTAINS $name
-        WITH t, dis LIMIT 50
-        OPTIONAL MATCH (t)-[:TESTS]->(x)
-        RETURN dis.id AS disease, t.id AS trial,
-               x.id AS target_id, labels(x)[0] AS target_type
+        MATCH (p:Paper)-[:PUBLISHES_RESULTS_OF]->(t:ClinicalTrial {id: $nct_id})
+        RETURN p.pmid AS pmid, p.title AS title, p.year AS year, p.url AS url, p.abstract AS abstract
         """
-        triples = []
         with self.driver.session() as session:
-            for row in [r.data() for r in session.run(query, name=disease)]:
-                triples.append({"source": row["trial"], "source_type": "ClinicalTrial",
-                                "rel": "STUDIES", "target": row["disease"], "target_type": "Disease"})
-                if row["target_id"]:
-                    triples.append({"source": row["trial"], "source_type": "ClinicalTrial",
-                                    "rel": "TESTS", "target": row["target_id"], "target_type": row["target_type"]})
-        return self._triples_to_graph(triples)
+            result = session.run(query, nct_id=nct_id)
+            return [record.data() for record in result]
+        
 
-    def _subgraph_drug(self, drug: str) -> dict:
-        triples = []
-        with self.driver.session() as session:
-            rows = [r.data() for r in session.run("""
-                MATCH (t:ClinicalTrial)-[:TESTS]->(d:Drug)
-                WHERE d.id CONTAINS $name
-                WITH t, d LIMIT 50
-                OPTIONAL MATCH (t)-[:STUDIES]->(dis:Disease)
-                RETURN d.id AS drug, t.id AS trial, dis.id AS disease
-            """, name=drug)]
-            for row in rows:
-                triples.append({"source": row["trial"], "source_type": "ClinicalTrial",
-                                "rel": "TESTS", "target": row["drug"], "target_type": "Drug"})
-                if row["disease"]:
-                    triples.append({"source": row["trial"], "source_type": "ClinicalTrial",
-                                    "rel": "STUDIES", "target": row["disease"], "target_type": "Disease"})
-            biomarkers = [r.data() for r in session.run("""
-                MATCH (d:Drug)-[:TARGETS]->(b:Biomarker)
-                WHERE d.id CONTAINS $name
-                RETURN d.id AS drug, b.id AS biomarker
-            """, name=drug)]
-            for row in biomarkers:
-                triples.append({"source": row["drug"], "source_type": "Drug",
-                                "rel": "TARGETS", "target": row["biomarker"], "target_type": "Biomarker"})
-        return self._triples_to_graph(triples)
-
-    def _subgraph_trial(self, nct_id: str) -> dict:
-        query = """
-        MATCH (t:ClinicalTrial {id: $nct_id})
-        OPTIONAL MATCH (t)-[r:TESTS|STUDIES]->(x)
-        RETURN t.id AS trial, type(r) AS rel,
-               x.id AS target_id, labels(x)[0] AS target_type
+    def get_complete_entity_info(self, entity_id: str, entity_type: str = None) -> dict:
         """
-        # Añadimos el nodo central aunque no tenga relaciones
-        triples = [{"source": nct_id, "source_type": "ClinicalTrial",
-                    "rel": None, "target": None, "target_type": None}]
+        Explora TODAS las relaciones de una entidad (fármaco, ensayo, enfermedad, paper, etc.)
+        y devuelve un diccionario completo con toda la información conectada.
+        """
         with self.driver.session() as session:
-            for row in [r.data() for r in session.run(query, nct_id=nct_id)]:
-                if row["target_id"]:
-                    triples.append({"source": row["trial"], "source_type": "ClinicalTrial",
-                                    "rel": row["rel"], "target": row["target_id"], "target_type": row["target_type"]})
-        return self._triples_to_graph(triples)
-
-    @staticmethod
-    def _triples_to_graph(rows: list[dict]) -> dict:
-        """Convierte filas source/target en {nodes, links} deduplicados."""
-        nodes: dict[str, dict] = {}
-
-        def add_node(nid, ntype):
-            if nid is not None and nid not in nodes:
-                nodes[nid] = {"id": nid, "label": nid, "type": ntype or "Unknown"}
-
-        links = []
-        for row in rows:
-            add_node(row.get("source"), row.get("source_type"))
-            add_node(row.get("target"), row.get("target_type"))
-            if row.get("source") and row.get("target") and row.get("rel"):
-                links.append({"source": row["source"], "target": row["target"], "rel": row["rel"]})
-        return {"nodes": list(nodes.values()), "links": links}
+            # Consulta que explora todas las relaciones en 2 saltos
+            query = """
+            MATCH (entity)
+            WHERE entity.id = $entity_id
+            OPTIONAL MATCH (entity)-[r1]-(neighbor1)
+            OPTIONAL MATCH (neighbor1)-[r2]-(neighbor2)
+            RETURN entity.id AS entity_id, labels(entity)[0] AS entity_type,
+                   neighbor1.id AS n1_id, labels(neighbor1)[0] AS n1_type, type(r1) AS r1_type,
+                   neighbor2.id AS n2_id, labels(neighbor2)[0] AS n2_type, type(r2) AS r2_type
+            LIMIT 100
+            """
+            result = session.run(query, entity_id=entity_id)
+            
+            info = {
+                'entity_id': entity_id,
+                'entity_type': entity_type or 'Unknown',
+                'direct_relations': [],
+                'indirect_relations': []
+            }
+            
+            seen_direct = set()
+            seen_indirect = set()
+            
+            for record in result:
+                # Relaciones directas
+                if record['n1_id'] and record['n1_id'] not in seen_direct:
+                    seen_direct.add(record['n1_id'])
+                    info['direct_relations'].append({
+                        'id': record['n1_id'],
+                        'type': record['n1_type'],
+                        'relation': record['r1_type']
+                    })
+                
+                # Relaciones indirectas (2 saltos)
+                if record['n2_id'] and record['n2_id'] not in seen_indirect and record['n2_id'] != entity_id:
+                    seen_indirect.add(record['n2_id'])
+                    info['indirect_relations'].append({
+                        'id': record['n2_id'],
+                        'type': record['n2_type'],
+                        'path': f"{entity_id} -[{record['r1_type']}]-> {record['n1_id']} -[{record['r2_type']}]-> {record['n2_id']}"
+                    })
+            
+            return info

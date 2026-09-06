@@ -108,13 +108,13 @@ main {
     background-color: #4a5568;
 }
 
-/* IMPORTANTE: Cytoscape necesita un contenedor con altura definida */
 #cy {
     width: 100%;
     height: 600px;
     background-color: #1a1f2e;
     border-radius: 8px;
     border: 1px solid #2d3748;
+    position: relative;
 }
 
 /* ---------- Búsqueda de ensayos ---------- */
@@ -124,7 +124,8 @@ main {
     margin-bottom: 1.5rem;
 }
 
-#search-input {
+#search-input,
+#paper-search-input {
     flex: 1;
     padding: 0.75rem 1rem;
     border-radius: 6px;
@@ -134,12 +135,14 @@ main {
     font-size: 1rem;
 }
 
-#search-input:focus {
+#search-input:focus,
+#paper-search-input:focus {
     outline: none;
     border-color: #ff4b4b;
 }
 
-#btn-search {
+#btn-search,
+#btn-paper-search {
     background-color: #ff4b4b;
     color: #fff;
     border: none;
@@ -149,11 +152,13 @@ main {
     font-size: 1rem;
 }
 
-#btn-search:hover {
+#btn-search:hover,
+#btn-paper-search:hover {
     background-color: #e63e3e;
 }
 
-#trials-results {
+#trials-results,
+#paper-search-results {
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -196,11 +201,28 @@ main {
 .status-TERMINATED { background-color: #742a2a; color: #fc8181; }
 .status-ACTIVE_NOT_RECRUITING { background-color: #744210; color: #f6ad55; }
 
-/* ---------- Chat RAG ---------- */
+/* ---------- Chat RAG: Layout de dos columnas ---------- */
+.chat-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    height: calc(100vh - 180px);
+    min-height: 500px;
+}
+
+@media (max-width: 1000px) {
+    .chat-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+}
+
+/* Columna izquierda: Chat */
 .chat-container {
     display: flex;
     flex-direction: column;
-    height: 600px;
+    height: 100%;
+    min-height: 0;
 }
 
 #chat-messages {
@@ -209,7 +231,9 @@ main {
     padding: 1rem;
     background-color: #1a1f2e;
     border-radius: 8px;
+    border: 1px solid #2d3748;
     margin-bottom: 1rem;
+    min-height: 200px;
 }
 
 .chat-message {
@@ -233,6 +257,7 @@ main {
 .chat-input {
     display: flex;
     gap: 0.5rem;
+    margin-bottom: 0.75rem;
 }
 
 #chat-question {
@@ -259,37 +284,10 @@ main {
     background-color: #e63e3e;
 }
 
-/* ---------- Utilidades ---------- */
-.loading {
-    text-align: center;
-    color: #a0aec0;
-    padding: 2rem;
-}
-
-.error {
-    color: #fc8181;
-    padding: 1rem;
-    background-color: #742a2a;
-    border-radius: 6px;
-}
-
-.success {
-    color: #68d391;
-    padding: 1rem;
-    background-color: #22543d;
-    border-radius: 6px;
-}
-/* ---------- Ajustes Chat RAG (sin scroll) ---------- */
-.chat-container {
-    height: calc(100vh - 220px);
-    min-height: 350px;
-}
-
 .chat-examples {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin-top: 0.75rem;
     align-items: center;
 }
 
@@ -314,7 +312,32 @@ main {
     color: #fff;
 }
 
-/* ---------- Layout de Ensayos (dos paneles) ---------- */
+/* Columna derecha: Grafo contextual */
+.chat-graph-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.chat-graph-container .graph-controls {
+    margin-bottom: 0.75rem;
+    padding: 0.6rem 1rem;
+    background-color: #1a1f2e;
+    border-radius: 8px;
+    border: 1px solid #2d3748;
+}
+
+#cy-chat {
+    flex: 1;
+    min-height: 400px;
+    background-color: #1a1f2e;
+    border-radius: 8px;
+    border: 1px solid #2d3748;
+    width: 100%;
+}
+
+/* ---------- Layout de Ensayos y Papers (dos paneles) ---------- */
 .trials-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -484,37 +507,156 @@ main {
     color: #fff;
 }
 
-/* ---------- Scroll en paneles de ensayos ---------- */
-#trials-results {
+/* ---------- Scroll en paneles ---------- */
+#trials-results,
+#imported-list,
+#paper-search-results,
+#imported-papers-list {
     max-height: 65vh;
     overflow-y: auto;
     padding-right: 0.5rem;
 }
 
-#imported-list {
-    max-height: 65vh;
-    overflow-y: auto;
-    padding-right: 0.5rem;
-}
-
-/* Barra de scroll estilizada (tema oscuro) */
 #trials-results::-webkit-scrollbar,
-#imported-list::-webkit-scrollbar {
+#imported-list::-webkit-scrollbar,
+#paper-search-results::-webkit-scrollbar,
+#imported-papers-list::-webkit-scrollbar {
     width: 8px;
 }
 
 #trials-results::-webkit-scrollbar-track,
-#imported-list::-webkit-scrollbar-track {
+#imported-list::-webkit-scrollbar-track,
+#paper-search-results::-webkit-scrollbar-track,
+#imported-papers-list::-webkit-scrollbar-track {
     background: #1a1f2e;
 }
 
 #trials-results::-webkit-scrollbar-thumb,
-#imported-list::-webkit-scrollbar-thumb {
+#imported-list::-webkit-scrollbar-thumb,
+#paper-search-results::-webkit-scrollbar-thumb,
+#imported-papers-list::-webkit-scrollbar-thumb {
     background: #4a5568;
     border-radius: 4px;
 }
 
 #trials-results::-webkit-scrollbar-thumb:hover,
-#imported-list::-webkit-scrollbar-thumb:hover {
+#imported-list::-webkit-scrollbar-thumb:hover,
+#paper-search-results::-webkit-scrollbar-thumb:hover,
+#imported-papers-list::-webkit-scrollbar-thumb:hover {
     background: #ff4b4b;
+}
+
+/* ---------- Panel flotante de detalles del nodo ---------- */
+.node-details-panel {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 320px;
+    background-color: #1a1f2e;
+    border: 1px solid #2d3748;
+    border-left: 4px solid #8e44ad;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    z-index: 100;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.close-details-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #a0aec0;
+    line-height: 1;
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.close-details-btn:hover {
+    background-color: #742a2a;
+    color: #fff;
+}
+
+#node-details-content h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    color: #fff;
+    font-size: 1rem;
+    padding-right: 20px;
+}
+
+#node-details-content p {
+    font-size: 0.85rem;
+    color: #cbd5e0;
+    margin: 0.4rem 0;
+    line-height: 1.4;
+}
+
+#node-details-content p strong {
+    color: #a0aec0;
+    font-weight: 600;
+}
+
+#node-details-content em {
+    color: #e2e8f0;
+    font-style: italic;
+    font-size: 0.82rem;
+    line-height: 1.3;
+}
+
+.pubmed-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    background-color: #8e44ad;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.pubmed-link:hover {
+    background-color: #6c3483;
+    color: #fff;
+}
+
+/* ---------- Utilidades ---------- */
+.loading {
+    text-align: center;
+    color: #a0aec0;
+    padding: 2rem;
+}
+
+.error {
+    color: #fc8181;
+    padding: 1rem;
+    background-color: #742a2a;
+    border-radius: 6px;
+}
+
+.success {
+    color: #68d391;
+    padding: 1rem;
+    background-color: #22543d;
+    border-radius: 6px;
 }
